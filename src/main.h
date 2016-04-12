@@ -11,6 +11,7 @@
 #include <string>
 #include <cstring>
 #include <vector>
+#include <climits>
 
 #include "gztools.h"
 
@@ -36,9 +37,11 @@ struct ECTOptions{
   bool Recurse;
 #endif
   unsigned DeflateMultithreading;
+  unsigned Iterations;
+  unsigned Stagnations;
 };
 
 int Optipng(unsigned filter, const char * Infile, bool force_no_palette, int nda);
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading);
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations);
 int mozjpegtran (bool arithmetic, bool progressive, bool strip, const char * Infile, const char * Outfile);
-int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP);
+int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP, unsigned iterations, unsigned stagnations);

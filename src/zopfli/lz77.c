@@ -295,7 +295,7 @@ size_t ZopfliLZ77LazyLauncher(const unsigned char* in,
   ZopfliInitLZ77Store(&store);
 
   ZopfliOptions options;
-  ZopfliInitOptions(&options, 4, 0, 0);
+  ZopfliInitOptions(&options, 4, 0, 0, UINT_MAX, 0);
   if (fs == 3){
     unsigned char x = 0;
     unsigned char* ou = 0;

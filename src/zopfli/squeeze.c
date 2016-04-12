@@ -553,6 +553,7 @@ static void ZopfliLZ77Optimal(const ZopfliOptions* options,
   double cost;
   double bestcost = ZOPFLI_LARGE_FLOAT;
   double lastcost = 0;
+  int i_since_best = 0;
   /* Try randomizing the costs a bit once the size stabilizes. */
   RanState ran_state;
   int lastrandomstep = -1;
@@ -581,7 +582,8 @@ static void ZopfliLZ77Optimal(const ZopfliOptions* options,
   }
   /* Repeat statistics with each time the cost model from the previous stat
   run. */
-  for (int i = 1; i < options->numiterations + 1; i++) {
+  for (int i = 1; (options->numiterations == 0 || i <= options->numiterations)
+               && i_since_best < options->numstagnations; i++) {
     ZopfliCleanLZ77Store(&currentstore);
     ZopfliInitLZ77Store(&currentstore);
 
@@ -611,7 +613,9 @@ static void ZopfliLZ77Optimal(const ZopfliOptions* options,
       ZopfliCopyLZ77Store(&currentstore, store);
       CopyStats(&stats, &beststats);
       bestcost = cost;
+      i_since_best = 0;
     }
+    else ++i_since_best;
     CopyStats(&stats, &laststats);
     GetStatistics(&currentstore, &stats);
     if (i == 4 && options->reuse_costmodel){

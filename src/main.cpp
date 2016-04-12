@@ -65,6 +65,8 @@ static void Usage() {
             " --mt-deflate=i Use per block multithreading in Deflate, use i threads\n"
 #endif
             //" --arithmetic   Use arithmetic encoding for JPEGs, incompatible with most software\n"
+            " --iterations=i  Absolute maximum number of iterations (overrides compression level)\n"
+            " --stagnations=i Number of iterations without improvement\n"
 #ifdef __DATE__
             ,__DATE__
 #endif
@@ -105,7 +107,7 @@ static void ECT_ReportSavings(){
     else {printf("No compatible files found\n");}
 }
 
-static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multithreading, long long fs, unsigned ZIP){
+static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multithreading, long long fs, unsigned ZIP, unsigned iterations, unsigned stagnations){
     if (!fs){
         printf("%s: Compression of empty files is currently not supported\n", Infile);
         return 2;
@@ -115,7 +117,7 @@ static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multi
             printf("%s: Compressed file already exists\n", Infile);
             return 2;
         }
-        ZopfliGzip(Infile, 0, Mode, multithreading, ZIP);
+        ZopfliGzip(Infile, 0, Mode, multithreading, ZIP, iterations, stagnations);
         return 1;
     }
     else {
@@ -126,7 +128,7 @@ static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multi
             return 2;
         }
         ungz(Infile, ((std::string)Infile).append(".ungz").c_str());
-        ZopfliGzip(((std::string)Infile).append(".ungz").c_str(), 0, Mode, multithreading, ZIP);
+        ZopfliGzip(((std::string)Infile).append(".ungz").c_str(), 0, Mode, multithreading, ZIP, iterations, stagnations);
         if (filesize(((std::string)Infile).append(".ungz.gz").c_str()) < filesize(Infile)){
             unlink(Infile);
             rename(((std::string)Infile).append(".ungz.gz").c_str(), Infile);
@@ -147,7 +149,7 @@ static void OptimizePNG(const char * Infile, const ECTOptions& Options){
     int x = 1;
     long long size = filesize(Infile);
     if(mode == 9 && !Options.Reuse && !Options.Allfilters){
-        x = Zopflipng(Options.strip, Infile, Options.Strict, 3, 0, Options.DeflateMultithreading);
+        x = Zopflipng(Options.strip, Infile, Options.Strict, 3, 0, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
     }
     //Disabled as using this causes libpng warnings
     //int filter = Optipng(Options.Mode, Infile, true, Options.Strict || Options.Mode > 1);
@@ -161,20 +163,20 @@ static void OptimizePNG(const char * Infile, const ECTOptions& Options){
     }
     if (mode != 1){
         if (Options.Allfilters){
-            x = Zopflipng(Options.strip, Infile, Options.Strict, mode, 6, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 0, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 1, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 2, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 3, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 4, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 5, Options.DeflateMultithreading);
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, 7, Options.DeflateMultithreading);
+            x = Zopflipng(Options.strip, Infile, Options.Strict, mode, 6, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 0, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 1, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 2, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 3, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 4, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 5, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, 7, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
         }
         else if (mode == 9){
-            Zopflipng(Options.strip, Infile, Options.Strict, mode, filter, Options.DeflateMultithreading);
+            Zopflipng(Options.strip, Infile, Options.Strict, mode, filter, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
         }
         else {
-            x = Zopflipng(Options.strip, Infile, Options.Strict, mode, filter, Options.DeflateMultithreading);
+            x = Zopflipng(Options.strip, Infile, Options.Strict, mode, filter, Options.DeflateMultithreading, Options.Iterations, Options.Stagnations);
         }
     }
     else {
@@ -257,7 +259,7 @@ static void fileHandler(const char * Infile, const ECTOptions& Options){
             }
             else if (Options.Gzip){
                 //if (!size)
-                statcompressedfile = ECTGzip(Infile, Options.Mode, Options.DeflateMultithreading, size, Options.Zip);
+                statcompressedfile = ECTGzip(Infile, Options.Mode, Options.DeflateMultithreading, size, Options.Zip, Options.Iterations, Options.Stagnations);
                 if (statcompressedfile == 2){
                     return;
                 }
@@ -300,6 +302,8 @@ int main(int argc, const char * argv[]) {
     Options.DeflateMultithreading = 0;
     Options.Reuse = 0;
     Options.Allfilters = 0;
+    Options.Iterations = UINT_MAX;
+    Options.Stagnations = 0;
     std::vector<int> args;
     int files = 0;
     if (argc >= 2){
@@ -343,6 +347,14 @@ int main(int argc, const char * argv[]) {
             }
 #endif
             else if (strcmp(argv[i], "--arithmetic") == 0) {Options.Arithmetic = true;}
+            else if (strncmp(argv[i], "--iterations=", 13) == 0){
+                Options.Iterations = atoi(argv[i] + 13);
+                if (Options.Iterations < 0) Options.Iterations = 0;
+            }
+            else if (strncmp(argv[i], "--stagnations=", 14) == 0){
+                Options.Stagnations = atoi(argv[i] + 14);
+                if (Options.Stagnations < 1) Options.Stagnations = 1;
+            }
             else {printf("Unknown flag: %s\n", argv[i]); return 0;}
         }
         if(Options.Reuse){

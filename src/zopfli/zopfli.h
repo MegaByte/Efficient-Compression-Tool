@@ -24,6 +24,7 @@ Author: jyrki.alakuijala@gmail.com (Jyrki Alakuijala)
 
 #include <stddef.h>
 #include <stdlib.h> /* for size_t */
+#include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,9 @@ typedef struct ZopfliOptions {
   several MB in size or it will be too slow.
   */
   int numiterations;
+
+  /* Number of times to rerun passes without improvement in compression. */
+  int numstagnations;
 
   /*
   Maximum amount of blocks to split into (0 for unlimited, but this can give
@@ -107,6 +111,7 @@ typedef struct ZopfliOptions {
 
 typedef struct ZopfliOptionsMin {
   int numiterations;
+  int numstagnations;
   unsigned searchext;
   unsigned short filter_style;
   unsigned noblocksplit;
@@ -115,7 +120,7 @@ typedef struct ZopfliOptionsMin {
   unsigned noblocksplitlz;
 } ZopfliOptionsMin;
 /* Initializes options with default values. */
-void ZopfliInitOptions(ZopfliOptions* options, unsigned mode, unsigned multithreading, unsigned isPNG);
+void ZopfliInitOptions(ZopfliOptions* options, unsigned mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations);
 
 /* Output format */
 typedef enum {

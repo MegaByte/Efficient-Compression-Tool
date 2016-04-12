@@ -47,6 +47,11 @@ struct ZopfliPNGOptions {
   //Use per block multithreading
   unsigned multithreading;
 
+  // Absolute maximum number of iterations
+  unsigned iterations;
+
+  // Number of iterations without improvement
+  unsigned stagnations;
 };
 
 ZopfliPNGOptions::ZopfliPNGOptions()
@@ -62,7 +67,7 @@ static unsigned CustomPNGDeflate(unsigned char** out, size_t* outsize, const uns
   const ZopfliPNGOptions* png_options = static_cast<const ZopfliPNGOptions*>(settings->custom_context);
   unsigned char bp = 0;
   ZopfliOptions options;
-  ZopfliInitOptions(&options, png_options->Mode, png_options->multithreading, 1);
+  ZopfliInitOptions(&options, png_options->Mode, png_options->multithreading, 1, png_options->iterations, png_options->stagnations);
   ZopfliDeflate(&options, 1, in, insize, &bp, out, outsize);
   return 0;
 }
@@ -208,7 +213,7 @@ static unsigned TryOptimize(std::vector<unsigned char>& image, unsigned w, unsig
   state.encoder.clean_alpha = png_options->lossy_transparent;
 
   ZopfliOptions dummyoptions;
-  ZopfliInitOptions(&dummyoptions, png_options->Mode, 0, 0);
+  ZopfliInitOptions(&dummyoptions, png_options->Mode, 0, 0, png_options->iterations, png_options->stagnations);
   state.encoder.filter_style = dummyoptions.filter_style;
   state.encoder.text_compression = 0;
   if (bit16) {
@@ -341,12 +346,14 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   return error;
 }
 
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading) {
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations) {
   ZopfliPNGOptions png_options;
   png_options.Mode = Mode;
   png_options.multithreading = multithreading;
   png_options.lossy_transparent = !strict && filter != 6;
   png_options.strip = strip;
+  png_options.iterations = iterations;
+  png_options.stagnations = stagnations;
   std::vector<unsigned char> origpng;
 
   std::vector<unsigned char> filters;

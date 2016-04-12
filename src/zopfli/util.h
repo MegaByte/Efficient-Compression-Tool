@@ -32,6 +32,7 @@ extern "C" {
 #endif
 
 #include <stdlib.h>
+#include <limits.h>
 
 /* Minimum and maximum length that can be encoded in deflate. */
 #define ZOPFLI_MAX_MATCH 258

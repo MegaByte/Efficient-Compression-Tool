@@ -1,7 +1,7 @@
 CC = gcc
 CXX = g++
-CFLAGS = -Ofast -std=gnu11
-CXXFLAGS= -Ofast -std=gnu++11
+CFLAGS = -Ofast -std=gnu11 -flto
+CXXFLAGS= -Ofast -std=gnu++11 -flto
 
 OBJECTS = blocksplitter.o codec.o image.o lz77.o opngreduc.o squeeze.o util.o LzFind.o
 CXXSRC = support.cpp zopflipng.cpp zopfli/deflate.cpp zopfli/zopfli_gzip.cpp zopfli/katajainen.cpp \

@@ -216,13 +216,14 @@ static const ZopfliOptionsMin opt[8] =
 };
 
 //TODO: Rename ZopfliOptions to ZSettings?
-void ZopfliInitOptions(ZopfliOptions* options, unsigned mode, unsigned multithreading, unsigned isPNG) {
+void ZopfliInitOptions(ZopfliOptions* options, unsigned mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations) {
   if (mode < 2){
     mode = 2;
   }
 
   ZopfliOptionsMin min = opt[mode - 2];
-  options->numiterations = min.numiterations;
+  options->numiterations = iterations != UINT_MAX ? iterations : min.numiterations;
+  options->numstagnations = stagnations == 0 ? options->numiterations : stagnations;
   options->searchext = min.searchext;
   options->filter_style = min.filter_style;
   options->noblocksplit = min.noblocksplit;

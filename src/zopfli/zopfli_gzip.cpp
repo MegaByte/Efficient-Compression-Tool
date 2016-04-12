@@ -250,13 +250,13 @@ static void CompressFile(const ZopfliOptions* options,
   free(out);
 }
 
-int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP) {
+int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP, unsigned iterations, unsigned stagnations) {
   ZopfliOptions options;
   //ZopfliFormat output_type = ZOPFLI_FORMAT_GZIP;
   //output_type = ZOPFLI_FORMAT_ZLIB;
   //output_type = ZOPFLI_FORMAT_DEFLATE;
 
-  ZopfliInitOptions(&options, mode, multithreading, 0);
+  ZopfliInitOptions(&options, mode, multithreading, 0, iterations, stagnations);
   //Append ".gz" ".zlib" ".deflate"
 
   CompressFile(&options, ZIP ? ZOPFLI_FORMAT_ZIP : ZOPFLI_FORMAT_GZIP, filename, outname ? outname : ((std::string)filename).append(ZIP ? ".zip" : ".gz").c_str());
