@@ -7,6 +7,8 @@
  * to libjpeg-turbo.
  * mozjpeg Modifications:
  * Copyright (C) 2014, Mozilla Corporation.
+ * Copyright (C) 2016, Matthieu Darbois.
+
  * For conditions of distribution and use, see the accompanying README file.
  *
  * This file contains Huffman entropy encoding routines for progressive JPEG.
@@ -41,7 +43,7 @@ typedef struct {
    */
   JOCTET * next_output_byte;    /* => next byte to write in buffer */
   size_t free_in_buffer;        /* # of byte spaces remaining in buffer */
-  INT32 put_buffer;             /* current bit-accumulation buffer */
+  size_t put_buffer;             /* current bit-accumulation buffer */
   int put_bits;                 /* # of bits now in it */
   j_compress_ptr cinfo;         /* link to cinfo (needed for dump_buffer) */
 
@@ -76,7 +78,7 @@ typedef phuff_entropy_encoder * phuff_entropy_ptr;
  * The minimum safe size is 64 bits.
  */
 
-#define MAX_CORR_BITS  1000     /* Max # of correction bits I can buffer */
+#define MAX_CORR_BITS  2000     /* Max # of correction bits I can buffer */
 
 /* IRIGHT_SHIFT is like RIGHT_SHIFT, but works on int rather than INT32.
  * We assume that int right shift is unsigned if INT32 right shift is,
@@ -176,6 +178,14 @@ start_pass_phuff (j_compress_ptr cinfo, boolean gather_statistics)
           (*cinfo->mem->alloc_small) ((j_common_ptr) cinfo, JPOOL_IMAGE,
                                       257 * sizeof(long));
       MEMZERO(entropy->count_ptrs[tbl], 257 * sizeof(long));
+      if (cinfo->master->trellis_passes) {
+        /* When generating tables for trellis passes, make sure that all */
+        /* codewords have an assigned length */
+        int i, j;
+        for (i = 0; i < 16; i++)
+          for (j = 0; j < 12; j++)
+            entropy->count_ptrs[tbl][16 * i + j] = 1;
+      }
     } else {
       /* Compute derived values for Huffman table */
       /* We may do this more than once for a table, but it's not expensive */
@@ -237,7 +247,7 @@ emit_bits (phuff_entropy_ptr entropy, unsigned int code, int size)
 /* Emit some bits, unless we are in gather mode */
 {
   /* This routine is heavily used, so it's worth coding tightly. */
-  register INT32 put_buffer = (INT32) code;
+  register size_t put_buffer = (size_t) code;
   register int put_bits = entropy->put_bits;
 
   /* if size is 0, caller used an invalid Huffman table entry */
@@ -247,7 +257,7 @@ emit_bits (phuff_entropy_ptr entropy, unsigned int code, int size)
   if (entropy->gather_statistics)
     return;                     /* do nothing if we're only getting stats */
 
-  put_buffer &= (((INT32) 1)<<size) - 1; /* mask off any extra bits in code */
+  put_buffer &= (((size_t) 1)<<size) - 1; /* mask off any extra bits in code */
 
   put_bits += size;             /* new number of bits in buffer */
 
@@ -322,13 +332,11 @@ emit_buffered_bits (phuff_entropy_ptr entropy, char * bufstart,
 LOCAL(void)
 emit_eobrun (phuff_entropy_ptr entropy)
 {
-  register int temp, nbits;
+  register int nbits;
 
   if (entropy->EOBRUN > 0) {    /* if there is any pending EOBRUN */
-    temp = entropy->EOBRUN;
-    nbits = 0;
-    while ((temp >>= 1))
-      nbits++;
+    nbits = JPEG_NBITS_NONZERO(entropy->EOBRUN) - 1;
+
     /* safety check: shouldn't happen given limited correction-bit buffer */
     if (nbits > 14)
       ERREXIT(entropy->cinfo, JERR_HUFF_MISSING_CODE);
@@ -477,6 +485,7 @@ encode_mcu_AC_first (j_compress_ptr cinfo, JBLOCKROW *MCU_data)
   int Se = cinfo->Se;
   int Al = cinfo->Al;
   JBLOCKROW block;
+  int deadzone = (1 << Al) - 1;
 #ifdef USE_INTRIN
   short t1[DCTSIZE2 + 8];
   short t2[DCTSIZE2 + 8];
@@ -522,14 +531,10 @@ encode_mcu_AC_first (j_compress_ptr cinfo, JBLOCKROW *MCU_data)
   }
   for (; k <= Se; k++) {
     temp = (*block)[jpeg_natural_order[k]];
-    if (temp < 0) {
-      temp = -temp;             /* temp is abs value of input */
-      temp >>= Al;              /* apply the point transform */
-      temp2 = ~temp;
-    } else {
-      temp >>= Al;              /* apply the point transform */
-      temp2 = temp;
-    }
+    int sign = temp >> 31;
+    temp += sign;
+    temp2 = temp >> Al;
+    temp = (temp ^ sign) >> Al;
     t1[k] = temp;
     t2[k] = temp2;
   }
@@ -570,7 +575,8 @@ encode_mcu_AC_first (j_compress_ptr cinfo, JBLOCKROW *MCU_data)
     temp2 = t2[k];
 
 #else
-    if ((temp = (*block)[jpeg_natural_order[k]]) == 0) {
+    temp = (*block)[jpeg_natural_order[k]];
+    if ((unsigned)(temp + deadzone) <= 2*deadzone) {
       r++;
       k++;
       continue;
@@ -580,21 +586,10 @@ encode_mcu_AC_first (j_compress_ptr cinfo, JBLOCKROW *MCU_data)
      * in C, we shift after obtaining the absolute value; so the code is
      * interwoven with finding the abs value (temp) and output bits (temp2).
      */
-    if (temp < 0) {
-      temp = -temp;             /* temp is abs value of input */
-      temp >>= Al;              /* apply the point transform */
-      /* For a negative coef, want temp2 = bitwise complement of abs(coef) */
-      temp2 = ~temp;
-    } else {
-      temp >>= Al;              /* apply the point transform */
-      temp2 = temp;
-    }
-    /* Watch out for case that nonzero coef is zero after point transform */
-    if (temp == 0) {
-      r++;
-      k++;
-      continue;
-    }
+    int sign = temp >> 31;
+    temp += sign;
+    temp2 = temp >> Al;
+    temp = (temp ^ sign) >> Al;
 #endif
 
     /* Emit any pending EOBRUN */
@@ -607,13 +602,7 @@ encode_mcu_AC_first (j_compress_ptr cinfo, JBLOCKROW *MCU_data)
     }
 
     /* Find the number of bits needed for the magnitude of the coefficient */
-#ifdef USE_INTRIN
-    nbits = 32 - __builtin_clz(temp);
-#else
-    nbits = 1;                  /* there must be at least one 1 bit */
-    while ((temp >>= 1))
-      nbits++;
-#endif
+    nbits = JPEG_NBITS_NONZERO(temp);
     /* Check for out-of-range coefficient values */
     if (nbits > MAX_COEF_BITS)
       ERREXIT(cinfo, JERR_BAD_DCT_COEF);

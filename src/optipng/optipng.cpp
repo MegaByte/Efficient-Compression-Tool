@@ -37,8 +37,9 @@
 struct opng_options
 {
     int fix;
-    int nda, nz;
+    int nz;
     unsigned optim_level;
+    unsigned clean_alpha;
 };
 
 // The optimization engine
@@ -113,7 +114,7 @@ static int opng_read_file(struct opng_session *session, FILE *stream, bool force
     struct opng_encoding_stats *stats = &session->in_stats;
 
     opng_init_codec_context(&context, image, stats, session->transformer);
-    if (opng_decode_image(&context, stream, session->Infile, force_no_palette) < 0)
+    if (opng_decode_image(&context, stream, session->Infile, force_no_palette, session->options->clean_alpha) < 0)
     {
         opng_decode_finish(&context, 1);
         return -1;
@@ -126,9 +127,6 @@ static int opng_read_file(struct opng_session *session, FILE *stream, bool force
         // Do not reduce files with PNG datastreams under -nz, signed files or files with APNG chunks.
         reductions = OPNG_REDUCE_NONE;
     }
-    else if (options->nda){
-        reductions &= ~OPNG_REDUCE_DIRTY_ALPHA;
-    }
     // Try to reduce the image.
     if (reductions != OPNG_REDUCE_NONE){
         reductions = opng_decode_reduce_image(&context, reductions);
@@ -139,7 +137,7 @@ static int opng_read_file(struct opng_session *session, FILE *stream, bool force
         opng_decode_finish(&context, 1);
         return -1;
     }
-    if (!stats->flags & OPNG_HAS_MULTIPLE_IMAGES)
+    if (!(stats->flags & OPNG_HAS_MULTIPLE_IMAGES))
         image->interlace_type = PNG_INTERLACE_NONE;
     // Keep the loaded image data.
     opng_decode_finish(&context, 0);
@@ -195,7 +193,7 @@ static int opng_optimize_impl(struct opng_session *session, const char *Infile, 
         opng_error(Infile,"This file is digitally signed and can't be processed");
         return -1;
     }
-    if (options->nz && !session->flags & OPNG_HAS_SNIPPED_IMAGES && !session->flags & OPNG_HAS_STRIPPED_METADATA){
+    if (options->nz && !(session->flags & OPNG_HAS_SNIPPED_IMAGES) && !(session->flags & OPNG_HAS_STRIPPED_METADATA)){
         return 0;
     }
 
@@ -235,36 +233,39 @@ static int opng_optimize_impl(struct opng_session *session, const char *Infile, 
         }
         return 0;
     }
-    else {
-        optk_uint64_t best_idat = 0;
+        uint64_t best_idat = 0;
         optimal_filter = 0;
         int level = 5;
         if (options->optim_level == 1){
             level = 51;
         }
         else if (options->optim_level > 3){
-            level = 9;
+          level = options->optim_level > 8 ? 9 : options->optim_level > 6 ? 7 : 6;
         }
         else if (options->optim_level == 3){
             level = 5;
         }
-
-        // Try filters PNG_FILTER_NONE and PNG_ALL_FILTERS.
+        else if (options->optim_level == 2){
+          level = 3;
+        }
 
         opng_write_file(session, 0, 0, level, true);
         best_idat = session->out_stats.idat_size;
 
         opng_write_file(session, 0, 1, level, true);
 
-        if (best_idat > session->out_stats.idat_size){
-            optimal_filter = 5;}
+      if (best_idat *
+          (options->optim_level > 4 ? 1.015 : 1) // Account for better filtering
+          > session->out_stats.idat_size){
+        best_idat = session->out_stats.idat_size;
+        optimal_filter = options->optim_level == 2 ? 8 : options->optim_level > 3 ? 11 : 5;
+      }
 
         if (options->optim_level == 1){
             fstream = fopen(Infile, "wb");
             opng_write_file(session, fstream, optimal_filter == 5, 1, false);
             fclose(fstream);
         }
-    }
     return optimal_filter;
 }
 
@@ -282,7 +283,7 @@ static int opng_optimize_file(opng_optimizer *optimizer, const char *Infile, boo
     return optimal_filter;
 }
 
-int Optipng(unsigned level, const char * Infile, bool force_no_palette, int nda)
+int Optipng(unsigned level, const char * Infile, bool force_no_palette, unsigned clean_alpha)
 {
   struct opng_options options;
   memset(&options, 0, sizeof(options));
@@ -302,7 +303,7 @@ int Optipng(unsigned level, const char * Infile, bool force_no_palette, int nda)
   else{
     options.optim_level = level;
   }
-  options.nda = nda;
+  options.clean_alpha = clean_alpha;
   the_optimizer->options = options;
   the_optimizer->transformer = the_transformer;
   int val = opng_optimize_file(the_optimizer, Infile, force_no_palette);

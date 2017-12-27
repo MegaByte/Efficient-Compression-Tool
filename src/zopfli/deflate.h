@@ -68,7 +68,11 @@ double ZopfliCalculateBlockSize(const unsigned short* litlens,
                                 size_t lstart, size_t lend, int btype, unsigned char hq, unsigned char symbols);
 
 void OptimizeHuffmanCountsForRle(int length, size_t* counts);
+size_t GetDynamicLengthsuse(unsigned* ll_lengths, unsigned* d_lengths, const size_t* ll_counts, const size_t* d_counts);
 
+size_t CalculateTreeSize(const unsigned* ll_lengths, unsigned* d_lengths, unsigned char hq, unsigned* best);
+
+size_t GetDynamicLengths2(unsigned* ll_lengths, unsigned* d_lengths, const size_t* ll_counts, const size_t* d_counts);
 #ifdef __cplusplus
 }  // extern "C"
 #endif

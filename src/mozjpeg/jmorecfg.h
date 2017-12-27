@@ -3,18 +3,17 @@
  *
  * This file was part of the Independent JPEG Group's software:
  * Copyright (C) 1991-1997, Thomas G. Lane.
+ * Modified 1997-2009 by Guido Vollbeding.
  * libjpeg-turbo Modifications:
- * Copyright (C) 2009, 2011, 2014, D. R. Commander.
- * For conditions of distribution and use, see the accompanying README file.
+ * Copyright (C) 2009, 2011, 2014-2015, D. R. Commander.
+ * For conditions of distribution and use, see the accompanying README.ijg
+ * file.
  *
  * This file contains additional configuration options that customize the
  * JPEG software for special applications or support machine-dependent
  * optimizations.  Most users will not need to touch this file.
  */
 
-/* Modified by Felix Hanau. */
-
-#include <stdbool.h>
 
 /*
  * Maximum number of components (color channels) allowed in JPEG image.
@@ -148,17 +147,48 @@ typedef unsigned int UINT16;
 typedef short INT16;
 #endif
 
-/* INT32 must hold at least signed 32-bit values. */
+/* INT32 must hold at least signed 32-bit values.
+ *
+ * NOTE: The INT32 typedef dates back to libjpeg v5 (1994.)  Integers were
+ * sometimes 16-bit back then (MS-DOS), which is why INT32 is typedef'd to
+ * long.  It also wasn't common (or at least as common) in 1994 for INT32 to be
+ * defined by platform headers.  Since then, however, INT32 is defined in
+ * several other common places:
+ *
+ * Xmd.h (X11 header) typedefs INT32 to int on 64-bit platforms and long on
+ * 32-bit platforms (i.e always a 32-bit signed type.)
+ *
+ * basetsd.h (Win32 header) typedefs INT32 to int (always a 32-bit signed type
+ * on modern platforms.)
+ *
+ * qglobal.h (Qt header) typedefs INT32 to int (always a 32-bit signed type on
+ * modern platforms.)
+ *
+ * This is a recipe for conflict, since "long" and "int" aren't always
+ * compatible types.  Since the definition of INT32 has technically been part
+ * of the libjpeg API for more than 20 years, we can't remove it, but we do not
+ * use it internally any longer.  We instead define a separate type (JLONG)
+ * for internal use, which ensures that internal behavior will always be the
+ * same regardless of any external headers that may be included.
+ */
 
 #ifndef XMD_H                   /* X11/xmd.h correctly defines INT32 */
+#ifndef _BASETSD_H_		/* Microsoft defines it in basetsd.h */
+#ifndef _BASETSD_H		/* MinGW is slightly different */
+#ifndef QGLOBAL_H		/* Qt defines it in qglobal.h */
 typedef long INT32;
+#endif
+#endif
+#endif
 #endif
 
 /* Datatype used for image dimensions.  The JPEG standard only supports
  * images up to 64K*64K due to 16-bit fields in SOF markers.  Therefore
  * "unsigned int" is sufficient on all machines.  However, if you need to
  * handle larger images and you don't mind deviating from the spec, you
- * can change this datatype.
+ * can change this datatype.  (Note that changing this datatype will
+ * potentially require modifying the SIMD code.  The x86-64 SIMD extensions,
+ * in particular, assume a 32-bit JDIMENSION.)
  */
 
 typedef unsigned int JDIMENSION;
@@ -183,6 +213,24 @@ typedef unsigned int JDIMENSION;
 #define EXTERN(type)            extern type
 
 
+/* Originally, this macro was used as a way of defining function prototypes
+ * for both modern compilers as well as older compilers that did not support
+ * prototype parameters.  libjpeg-turbo has never supported these older,
+ * non-ANSI compilers, but the macro is still included because there is some
+ * software out there that uses it.
+ */
+
+#define JMETHOD(type,methodname,arglist)  type (*methodname) arglist
+
+
+/* libjpeg-turbo no longer supports platforms that have far symbols (MS-DOS),
+ * but again, some software relies on this macro.
+ */
+
+#undef FAR
+#define FAR
+
+
 /*
  * On a few systems, type boolean and/or its values FALSE, TRUE may appear
  * in standard header files.  Or you may have conflicts with application-
@@ -191,7 +239,7 @@ typedef unsigned int JDIMENSION;
  */
 
 #ifndef HAVE_BOOLEAN
-typedef bool boolean;
+typedef int boolean;
 #endif
 #ifndef FALSE                   /* in case these macros already exist */
 #define FALSE   0               /* values of boolean */
@@ -225,9 +273,9 @@ typedef bool boolean;
 
 /* Capability options common to encoder and decoder: */
 
-#define DCT_ISLOW_SUPPORTED     /* slow but accurate integer algorithm */
-#undef DCT_IFAST_SUPPORTED     /* faster, less accurate integer method */
-#define DCT_FLOAT_SUPPORTED     /* floating-point: accurate, fast on fast HW */
+#undef  DCT_ISLOW_SUPPORTED     /* slow but accurate integer algorithm */
+#undef  DCT_IFAST_SUPPORTED     /* faster, less accurate integer method */
+#undef  DCT_FLOAT_SUPPORTED     /* floating-point: accurate, fast on fast HW */
 
 /* Encoder capability options: */
 
@@ -242,19 +290,19 @@ typedef bool boolean;
  * The exact same statements apply for progressive JPEG: the default tables
  * don't work for progressive mode.  (This may get fixed, however.)
  */
-#undef INPUT_SMOOTHING_SUPPORTED   /* Input image smoothing option? */
+#undef  INPUT_SMOOTHING_SUPPORTED   /* Input image smoothing option? */
 
 /* Decoder capability options: */
 
 #define D_MULTISCAN_FILES_SUPPORTED /* Multiple-scan JPEG files? */
 #define D_PROGRESSIVE_SUPPORTED     /* Progressive JPEG? (Requires MULTISCAN)*/
 #define SAVE_MARKERS_SUPPORTED      /* jpeg_save_markers() needed? */
-#undef BLOCK_SMOOTHING_SUPPORTED   /* Block smoothing? (Progressive only) */
-#define IDCT_SCALING_SUPPORTED      /* Output rescaling via IDCT? */
+#undef  BLOCK_SMOOTHING_SUPPORTED   /* Block smoothing? (Progressive only) */
+#undef  IDCT_SCALING_SUPPORTED      /* Output rescaling via IDCT? */
 #undef  UPSAMPLE_SCALING_SUPPORTED  /* Output rescaling at upsample stage? */
-#undef UPSAMPLE_MERGING_SUPPORTED  /* Fast path for sloppy upsampling? */
-#undef QUANT_1PASS_SUPPORTED       /* 1-pass color quantization? */
-#undef QUANT_2PASS_SUPPORTED       /* 2-pass color quantization? */
+#undef  UPSAMPLE_MERGING_SUPPORTED  /* Fast path for sloppy upsampling? */
+#undef  QUANT_1PASS_SUPPORTED       /* 1-pass color quantization? */
+#undef  QUANT_2PASS_SUPPORTED       /* 2-pass color quantization? */
 
 /* more capability options later, no doubt */
 

@@ -29,8 +29,8 @@ void MatchFinder_Create(CMatchFinder *p)
   p->pos = ZOPFLI_WINDOW_SIZE;
 }
 
-static UInt32 * GetMatches(UInt32 lenLimit, UInt32 curMatch, UInt32 pos, const Byte *cur, UInt32 *son,
-                         UInt32 _cyclicBufferPos, UInt32 *distances, UInt32 maxLen)
+static unsigned short * GetMatches(UInt32 lenLimit, UInt32 curMatch, UInt32 pos, const Byte *cur, UInt32 *son,
+                         UInt32 _cyclicBufferPos, unsigned short *distances, UInt32 maxLen)
 {
   UInt32 *ptr0 = son + (_cyclicBufferPos << 1) + 1;
   UInt32 *ptr1 = son + (_cyclicBufferPos << 1);
@@ -140,7 +140,7 @@ static void SkipMatches(UInt32 lenLimit, UInt32 curMatch, UInt32 pos, const Byte
 
 #define MF_PARAMS(p) p->pos, p->buffer, p->son, p->cyclicBufferPos
 
-UInt32 Bt3Zip_MatchFinder_GetMatches(CMatchFinder *p, UInt32 *distances)
+unsigned short Bt3Zip_MatchFinder_GetMatches(CMatchFinder *p, unsigned short *distances)
 {
   unsigned lenl = p->bufend - p->buffer; { if (lenl < ZOPFLI_MIN_MATCH) {return 0;}}
   const Byte *cur = p->buffer;
@@ -154,7 +154,7 @@ UInt32 Bt3Zip_MatchFinder_GetMatches(CMatchFinder *p, UInt32 *distances)
 
 void Bt3Zip_MatchFinder_Skip(CMatchFinder* p, UInt32 num)
 {
-  do
+  while (num--)
   {
     const Byte *cur = p->buffer;
     UInt32 hashValue = ((cur[2] | ((UInt32)cur[0] << 8)) ^ crc[cur[1]]) & 0xFFFF;
@@ -164,7 +164,6 @@ void Bt3Zip_MatchFinder_Skip(CMatchFinder* p, UInt32 num)
     SkipMatches(lenlimit > ZOPFLI_MAX_MATCH ? ZOPFLI_MAX_MATCH : lenlimit, curMatch, MF_PARAMS(p));
     MOVE_POS;
   }
-  while (--num);
 }
 
 void CopyMF(const CMatchFinder *p, CMatchFinder* copy){

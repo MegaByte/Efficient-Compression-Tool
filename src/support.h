@@ -9,11 +9,20 @@
 #ifndef __Efficient_Compression_Tool__support__
 #define __Efficient_Compression_Tool__support__
 
+#include <unistd.h>
+#include <time.h>
+
 // Returns Filesize of Infile
 long long filesize (const char * Infile);
 
 bool exists(const char * Infile);
 
 bool writepermission (const char * Infile);
+
+bool isDirectory(const char *path);
+
+time_t get_file_time(const char* Infile);
+
+void set_file_time(const char* Infile, time_t otime);
 
 #endif /* defined(__Efficient_Compression_Tool__support__) */

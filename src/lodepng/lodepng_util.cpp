@@ -66,6 +66,12 @@ unsigned getChunks(std::vector<std::string> names[3],
     {
         //Copying tRNS can damage images
     }
+    else if(name == "sBIT")
+    {
+    }
+    else if(name == "bKGD")
+    {
+    }
     else if(name != "IEND")
     {
       names[location].push_back(name);
@@ -130,12 +136,11 @@ unsigned insertChunks(std::vector<unsigned char>& png,
 }
 
 #include <stdlib.h>
-  static unsigned decompress(std::vector<unsigned char>& out, const unsigned char* in, size_t insize,
-                      const LodePNGDecompressSettings& settings)
+  static unsigned decompress(std::vector<unsigned char>& out, const unsigned char* in, size_t insize)
   {
     unsigned char* buffer = 0;
     size_t buffersize = 0;
-    unsigned error = lodepng_zlib_decompress(&buffer, &buffersize, in, insize, &settings);
+    unsigned error = lodepng_zlib_decompress(&buffer, &buffersize, in, insize);
     if(buffer)
     {
       out.insert(out.end(), &buffer[0], &buffer[buffersize]);
@@ -190,9 +195,7 @@ unsigned insertChunks(std::vector<unsigned char>& png,
 
     //Decompress all IDAT data
     std::vector<unsigned char> data;
-    LodePNGDecompressSettings settings;
-    lodepng_decompress_settings_init(&settings);
-    error = lodepng::decompress(data, &zdata[0], zdata.size(), settings);
+    error = lodepng::decompress(data, &zdata[0], zdata.size());
 
     if(error) return 1;
 

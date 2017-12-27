@@ -21,7 +21,6 @@ Author: jyrki.alakuijala@gmail.com (Jyrki Alakuijala)
 
 #include "lz77.h"
 #include "util.h"
-#include "disttable.h"
 #include "match.h"
 
 #include <assert.h>
@@ -58,7 +57,7 @@ void ZopfliCopyLZ77Store(const ZopfliLZ77Store* source, ZopfliLZ77Store* dest) {
 Appends the length and distance to the LZ77 arrays of the ZopfliLZ77Store.
 context must be a ZopfliLZ77Store*.
 */
-static void ZopfliStoreLitLenDist(unsigned short length, unsigned short dist,
+static void ZopfliStoreLitLenDist(unsigned short length, unsigned char dist,
                            ZopfliLZ77Store* store) {
   size_t size2 = store->size;  /* Needed for using ZOPFLI_APPEND_DATA twice. */
   ZOPFLI_APPEND_DATA(length, &store->litlens, &store->size);
@@ -79,12 +78,10 @@ static unsigned symtox(unsigned lls){
   if (lls <= 279){
     return 0;
   }
-  else if (lls <= 283){
+  if (lls <= 283){
     return 100;
   }
-  else{
-    return 200;
-  }
+  return 200;
 }
 
 /*
@@ -189,7 +186,7 @@ static void LZ4HC_Insert (LZ4HC_Data_Structure* hc4, const BYTE* ip)
   while(idx < target)
   {
     U32 h = LZ4HC_hashPtr(base+idx);
-    size_t delta = idx - HashTable[h];
+    U32 delta = idx - HashTable[h];
     if (delta>MAX_DISTANCE) delta = MAX_DISTANCE;
     chainTable[idx & MAX_DISTANCE] = (U16)delta;
     HashTable[h] = idx;
@@ -211,7 +208,7 @@ static void LZ4HC_Insert3 (LZ3HC_Data_Structure* hc4, const BYTE* ip)
   while(idx < target)
   {
     U32 h = LZ4HC_hashPtr3(base+idx);
-    size_t delta = idx - HashTable[h];
+    U32 delta = idx - HashTable[h];
     if (delta>MAX_DISTANCE3) delta = MAX_DISTANCE3;
     chainTable[idx & MAX_DISTANCE3] = (U16)delta;
     HashTable[h] = idx;
@@ -221,7 +218,7 @@ static void LZ4HC_Insert3 (LZ3HC_Data_Structure* hc4, const BYTE* ip)
   hc4->nextToUpdate = target;
 }
 
-static int LZ4HC_InsertAndFindBestMatch (LZ4HC_Data_Structure* hc4,   /* Index table will be updated */
+static int LZ4HC_InsertAndFindBestMatch(LZ4HC_Data_Structure* hc4,   /* Index table will be updated */
                                                const BYTE* ip, const BYTE* const iLimit,
                                                const BYTE** matchpos)
 {
@@ -387,7 +384,7 @@ void ZopfliLZ77Lazy(const ZopfliOptions* options, const unsigned char* in,
 #endif
 
         unsigned lls = ZopfliGetLengthSymbol(leng);
-        ZopfliStoreLitLenDist(lls + ((leng - symtox(lls)) << 9), disttable[dist] + 1, store);
+        ZopfliStoreLitLenDist(lls + ((leng - symtox(lls)) << 9), ZopfliGetDistSymbol(dist) + 1, store);
         i += leng - 2;
         continue;
       }
@@ -405,7 +402,7 @@ void ZopfliLZ77Lazy(const ZopfliOptions* options, const unsigned char* in,
         ZopfliVerifyLenDist(in, inend, i, dist, leng);
 #endif
       unsigned lls = ZopfliGetLengthSymbol(leng);
-      ZopfliStoreLitLenDist(lls + ((leng - symtox(lls)) << 9), disttable[dist] + 1, store);
+      ZopfliStoreLitLenDist(lls + ((leng - symtox(lls)) << 9), ZopfliGetDistSymbol(dist) + 1, store);
 
     } else {
       leng = 1;
@@ -422,6 +419,8 @@ void ZopfliLZ77Counts(const unsigned short* litlens, const unsigned short* dists
   for (unsigned i = 0; i < 32; i++) {
     d_count[i] = 0;
   }
+  ll_count[256] = 1;  /* End symbol. */
+
   size_t i;
 
   if (symbols){
@@ -439,7 +438,7 @@ void ZopfliLZ77Counts(const unsigned short* litlens, const unsigned short* dists
       ll_count[litlens[i] & 511]++;
     }
 
-#define ANDLLS 511LU + (511LU << 16) + (511LU << 32) + (511LU << 48)
+#define ANDLLS 511LLU + (511LLU << 16) + (511LLU << 32) + (511LLU << 48)
     const unsigned char* ipo = &distc[rstart];
     size_t cached = *(size_t*)ipo;ipo += 8;
     while (ipo < distc + end)
@@ -520,26 +519,27 @@ void ZopfliLZ77Counts(const unsigned short* litlens, const unsigned short* dists
     }
 #endif
 
-    ll_count[256] = 1;  /* End symbol. */
-
     return;
   }
 
   size_t lenarrything[515] = {0};
   size_t lenarrything2[515] = {0};
-  size_t d_count2[32] = {0};
+  size_t d_count2[64] = {0};
+
+  size_t* dc = d_count2 + 1;
+  size_t* dc2 = d_count2 + 32;
 
   if ((end - start) % 2){
     lenarrything[litlens[start] + !dists[start] * 259]++;
-    d_count[disttable[dists[start]]]++;
+    dc[ZopfliGetDistSymbol(dists[start])]++;
     start++;
   }
   for (i = start; i < end; i++) {
     lenarrything[litlens[i] + !dists[i] * 259]++;
-    d_count[disttable[dists[i]]]++;
+    dc[ZopfliGetDistSymbol(dists[i])]++;
     i++;
     lenarrything2[litlens[i] + !dists[i] * 259]++;
-    d_count2[disttable[dists[i]]]++;
+    dc2[ZopfliGetDistSymbol(dists[i])]++;
   }
 
   for (i = 0; i < 256; i++){
@@ -549,10 +549,7 @@ void ZopfliLZ77Counts(const unsigned short* litlens, const unsigned short* dists
   for (i = 3; i < 259; i++){
     ll_count[ZopfliGetLengthSymbol(i)] += lenarrything[i] + lenarrything2[i];
   }
-  for (i = 0; i < 32; i++){
-    d_count[i] += d_count2[i];
+  for (i = 0; i < 30; i++){
+    d_count[i] = dc[i] + dc2[i];
   }
-
-  d_count[30] = 0;
-  ll_count[256] = 1;  /* End symbol. */
 }

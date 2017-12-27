@@ -45,20 +45,7 @@ typedef struct ZopfliOptions {
   /* Number of times to rerun passes without improvement in compression. */
   int numstagnations;
 
-  /*
-  Maximum amount of blocks to split into (0 for unlimited, but this can give
-  extreme results that hurt compression on some files). Default value: 15.
-  */
-  unsigned blocksplittingmax;
-
-  /*
-  Limit the max hash chain hits for this hash value. This has an effect only
-  on files where the hash value is the same very often. On these files, this
-  gives worse compression (the value should ideally be 32768, which is the
-  ZOPFLI_WINDOW_SIZE, while zlib uses 4096 even for best level), but makes it
-  faster on some specific files.
-  */
-  unsigned short filter_style;
+  unsigned filter_style;
 
   /* Don't try to use dynamic block under this size. */
   unsigned skipdynamic;
@@ -94,8 +81,6 @@ typedef struct ZopfliOptions {
   /*Use tuning for PNG files*/
   unsigned isPNG;
 
-  unsigned midsplit;
-
   /*Replace short lengths with literals if that improves compression. Higher numbers mean more aggressive behaviour.*/
   unsigned replaceCodes;
 
@@ -107,6 +92,12 @@ typedef struct ZopfliOptions {
 
   /*Use greedy search instead of lazy search above this value.*/
   unsigned greed;
+
+  /*Use shannon entropy instead of real code lengths in blocksplitting.*/
+  unsigned entropysplit;
+
+  /*Use advanced huffman and header optimizations.*/
+  unsigned advanced;
 } ZopfliOptions;
 
 typedef struct ZopfliOptionsMin {

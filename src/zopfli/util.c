@@ -22,9 +22,6 @@ Author: jyrki.alakuijala@gmail.com (Jyrki Alakuijala)
 #include "util.h"
 #include "zopfli.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 unsigned ZopfliGetDistExtraBits(unsigned dist) {
 #ifdef __GNUC__
   if (dist < 5) return 0;
@@ -51,10 +48,9 @@ unsigned ZopfliGetDistExtraBitsValue(unsigned dist) {
 #ifdef __GNUC__
   if (dist < 5) {
     return 0;
-  } else {
-    int l = 31 ^ __builtin_clz(dist - 1); /* log2(dist - 1) */
-    return (dist - (1 + (1 << l))) & ((1 << (l - 1)) - 1);
   }
+  int l = 31 ^ __builtin_clz(dist - 1); /* log2(dist - 1) */
+  return (dist - (1 + (1 << l))) & ((1 << (l - 1)) - 1);
 #else
   if (dist < 5) return 0;
   else if (dist < 9) return (dist - 5) & 1;
@@ -74,14 +70,13 @@ unsigned ZopfliGetDistExtraBitsValue(unsigned dist) {
 }
 
 int ZopfliGetDistSymbol(int dist) {
-#ifdef __GNUC__ 
+#ifdef __GNUC__
   if (dist < 5) {
     return dist - 1;
-  } else {
-    int l = (31 ^ __builtin_clz(dist - 1)); /* log2(dist - 1) */
-    int r = ((dist - 1) >> (l - 1)) & 1;
-    return l * 2 + r;
   }
+  int l = (31 ^ __builtin_clz(dist - 1)); /* log2(dist - 1) */
+  int r = ((dist - 1) >> (l - 1)) & 1;
+  return l * 2 + r;
 #else
   if (dist < 193) {
     if (dist < 13) {  /* dist 0..13. */
@@ -205,43 +200,42 @@ unsigned ZopfliGetLengthSymbol(unsigned l) {
 
 static const ZopfliOptionsMin opt[8] =
 {
-  { 1, 0, 0,  10000,    0, 180, 2500},/* 2 */
-  { 1, 1, 0,   3000,    0, 180,  512},/* 3 */
-  { 2, 1, 0,   3000,    0, 180,  512},/* 4 */
-  { 4, 1, 0,   2000,    0, 180,  200},/* 5 */
-  { 8, 1, 0,    800,  800,  80,  200},/* 6 */
-  {16, 1, 1,    800, 1800,  80,  200},/* 7 */
-  {60, 2, 2,    800, 2000,  80,  100},/* 8 */
-  {60, 2, 3,    800, 3000,  80,  100} /* 9 */
+  { 1, 0, 0, 2000,    0, 180,  800}, /* 2 */
+  { 1, 1, 0, 2000,    0, 180,  512}, /* 3 */
+  { 2, 1, 0, 2000,    0, 180,  512}, /* 4 */
+  { 3, 1, 1, 2000,    0, 180,  200}, /* 5 */
+  { 8, 1, 1, 1300,  800,  80,  200}, /* 6 */
+  {13, 1, 1, 1000, 1800,  80,  200}, /* 7 */
+  {60, 1, 2,  800, 2000,  80,  120}, /* 8 */
+  {60, 2, 3,  800, 3000,  80,  100}  /* 9 */
 };
 
-//TODO: Rename ZopfliOptions to ZSettings?
-void ZopfliInitOptions(ZopfliOptions* options, unsigned mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations) {
+void ZopfliInitOptions(ZopfliOptions* options, unsigned _mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations) {
+  options->twice = (_mode - (_mode % 10000)) / 10000;
+  unsigned mode = _mode % 10000 > 9 ? 9 : _mode % 10000;
   if (mode < 2){
     mode = 2;
   }
 
   ZopfliOptionsMin min = opt[mode - 2];
-  options->numiterations = iterations != UINT_MAX ? iterations : min.numiterations;
+  options->numiterations = iterations != UINT_MAX ? iterations : _mode % 10000 > 9 ? _mode % 10000 : min.numiterations;
   options->numstagnations = stagnations == 0 ? options->numiterations : stagnations;
   options->searchext = min.searchext;
   options->filter_style = min.filter_style;
   options->noblocksplit = min.noblocksplit;
-  options->skipdynamic = min.skipdynamic;
   options->trystatic = min.trystatic;
+  options->skipdynamic = min.skipdynamic;
   options->noblocksplitlz = min.noblocksplitlz;
 
-  options->num = mode < 5 ? 3 : 9;
-  options->blocksplittingmax = mode > 3 || isPNG ? 0 : multithreading > 15 ? multithreading : 15;
+  options->num = mode < 6 ? 3 : 9;
 
+  options->replaceCodes = 1000 * (mode > 2) + 1;
   options->multithreading = multithreading;
   options->isPNG = isPNG;
-  options->reuse_costmodel = (!isPNG) && (!multithreading);
+  options->reuse_costmodel = (!isPNG || mode > 6) && multithreading < 2;
   options->useCache = 1;
-  options->midsplit = mode == 2;
-  options->ultra = mode >= 8;
-
-  options->replaceCodes = (2 * (mode > 5) + (mode == 9) * 18) * !options->ultra;
-  options->twice = 0;//mode == 9;
+  options->ultra = (mode >= 5) + (options->numiterations > 60) + (options->numiterations > 90);
+  options->entropysplit = mode < 3;
   options->greed = isPNG ? mode > 3 ? 258 : 50 : 258;
+  options->advanced = mode >= 5;
 }

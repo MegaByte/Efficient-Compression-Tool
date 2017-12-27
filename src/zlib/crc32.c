@@ -166,10 +166,7 @@ static void fold_4(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m1
             0x00000001, 0xc6e41596);
 
     __m128i x_tmp0, x_tmp1, x_tmp2, x_tmp3;
-    __m128 ps_crc0, ps_crc1, ps_crc2, ps_crc3;
-    __m128 ps_t0, ps_t1, ps_t2, ps_t3;
-    __m128 ps_res0, ps_res1, ps_res2, ps_res3;
-
+  
     x_tmp0 = *xmm_crc0;
     x_tmp1 = *xmm_crc1;
     x_tmp2 = *xmm_crc2;
@@ -177,32 +174,19 @@ static void fold_4(__m128i *xmm_crc0, __m128i *xmm_crc1, __m128i *xmm_crc2, __m1
 
     *xmm_crc0 = _mm_clmulepi64_si128(*xmm_crc0, xmm_fold4, 0x01);
     x_tmp0 = _mm_clmulepi64_si128(x_tmp0, xmm_fold4, 0x10);
-    ps_crc0 = _mm_castsi128_ps(*xmm_crc0);
-    ps_t0 = _mm_castsi128_ps(x_tmp0);
-    ps_res0 = _mm_xor_ps(ps_crc0, ps_t0);
+    *xmm_crc0 = _mm_xor_si128(*xmm_crc0, x_tmp0);
 
     *xmm_crc1 = _mm_clmulepi64_si128(*xmm_crc1, xmm_fold4, 0x01);
     x_tmp1 = _mm_clmulepi64_si128(x_tmp1, xmm_fold4, 0x10);
-    ps_crc1 = _mm_castsi128_ps(*xmm_crc1);
-    ps_t1 = _mm_castsi128_ps(x_tmp1);
-    ps_res1 = _mm_xor_ps(ps_crc1, ps_t1);
+    *xmm_crc1 = _mm_xor_si128(*xmm_crc1, x_tmp1);
 
     *xmm_crc2 = _mm_clmulepi64_si128(*xmm_crc2, xmm_fold4, 0x01);
     x_tmp2 = _mm_clmulepi64_si128(x_tmp2, xmm_fold4, 0x10);
-    ps_crc2 = _mm_castsi128_ps(*xmm_crc2);
-    ps_t2 = _mm_castsi128_ps(x_tmp2);
-    ps_res2 = _mm_xor_ps(ps_crc2, ps_t2);
+    *xmm_crc2 = _mm_xor_si128(*xmm_crc2, x_tmp2);
 
     *xmm_crc3 = _mm_clmulepi64_si128(*xmm_crc3, xmm_fold4, 0x01);
     x_tmp3 = _mm_clmulepi64_si128(x_tmp3, xmm_fold4, 0x10);
-    ps_crc3 = _mm_castsi128_ps(*xmm_crc3);
-    ps_t3 = _mm_castsi128_ps(x_tmp3);
-    ps_res3 = _mm_xor_ps(ps_crc3, ps_t3);
-
-    *xmm_crc0 = _mm_castps_si128(ps_res0);
-    *xmm_crc1 = _mm_castps_si128(ps_res1);
-    *xmm_crc2 = _mm_castps_si128(ps_res2);
-    *xmm_crc3 = _mm_castps_si128(ps_res3);
+    *xmm_crc3 = _mm_xor_si128(*xmm_crc3, x_tmp3);
 }
 
 static const unsigned __attribute__((aligned(32))) pshufb_shf_table[60] = {
@@ -282,10 +266,14 @@ static void crc_fold(deflate_state * s,
     CRC_LOAD(s)
 
     if (len < 16) {
-        if (len == 0)
-            return;
-        xmm_crc_part = _mm_loadu_si128((__m128i *)src);
-        goto partial;
+      char __attribute__((aligned((16)))) partial_buf[16] = { 0 };
+
+      if (len == 0)
+        return;
+
+      memcpy(partial_buf, src, len);
+      xmm_crc_part = _mm_loadu_si128((const __m128i *)partial_buf);
+      goto partial;
     }
 
     algn_diff = 0 - (unsigned long)src & 0xF;
