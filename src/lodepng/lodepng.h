@@ -428,6 +428,17 @@ unsigned lodepng_get_color_profile(LodePNGColorProfile* profile,
                                    const unsigned char* image, unsigned w, unsigned h,
                                    const LodePNGColorMode* mode_in);
 
+typedef struct GeneticAlgorithmSettings
+{
+  unsigned number_of_generations;
+  unsigned number_of_stagnations;
+  unsigned population_size;
+  float mutation_probability;
+  float crossover_probability;
+  unsigned number_of_offspring;
+  unsigned tournament_size;
+} GeneticAlgorithmSettings;
+
 /*Settings for the encoder.*/
 typedef struct LodePNGEncoderSettings
 {
@@ -454,6 +465,8 @@ typedef struct LodePNGEncoderSettings
 
     /* filter_style for LFS_BRUTE_FORCE*/
     unsigned short filter_style;
+
+  GeneticAlgorithmSettings ga;
 } LodePNGEncoderSettings;
 
 void lodepng_encoder_settings_init(LodePNGEncoderSettings* settings);
@@ -605,6 +618,9 @@ without warning.
 void save_file(const std::vector<unsigned char>& buffer, const std::string& filename);
 #endif //LODEPNG_COMPILE_DISK
 #endif //LODEPNG_COMPILE_PNG
+
+/* Generate a random filter */
+void randomFilter(unsigned char* filter, unsigned n);
 } //namespace lodepng
 #endif /*LODEPNG_COMPILE_CPP*/
 

@@ -387,6 +387,8 @@ static unsigned TryOptimize(std::vector<unsigned char>& image, unsigned w, unsig
   state.encoder.zlibsettings.custom_deflate = CustomPNGDeflate;
   state.encoder.zlibsettings.custom_context = png_options;
   state.encoder.clean_alpha = png_options->lossy_transparent;
+  state.encoder.ga.number_of_generations = png_options->iterations;
+  if (png_options->stagnations > 0) state.encoder.ga.number_of_stagnations = png_options->stagnations;
 
   ZopfliOptions dummyoptions;
   ZopfliInitOptions(&dummyoptions, png_options->Mode, 0, 0, png_options->iterations, png_options->stagnations);
@@ -402,6 +404,8 @@ static unsigned TryOptimize(std::vector<unsigned char>& image, unsigned w, unsig
     state.encoder.predefined_filters = &filters[0];
     state.encoder.auto_convert = 0;
     lodepng_color_mode_copy(&state.info_png.color, &inputstate.info_png.color);
+  } else if (best_filter == 14) {
+    state.encoder.predefined_filters = &filters[0];
   }
 
   LodePNGPaletteSettings p;
@@ -495,7 +499,7 @@ static unsigned TryOptimize(std::vector<unsigned char>& image, unsigned w, unsig
 }
 
 static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, const ZopfliPNGOptions& png_options, std::vector<unsigned char>* resultpng, int best_filter,
-                                  std::vector<unsigned char> filters, unsigned palette_filter) {
+                                  const std::vector<unsigned char>& filters, unsigned palette_filter, std::vector<unsigned char>& filter_bank, int filter_index) {
   std::vector<unsigned char> image;
   unsigned w, h;
   lodepng::State inputstate;
@@ -524,6 +528,10 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   std::vector<unsigned char> temp;
   error = TryOptimize(image, w, h, bit16, inputstate, &png_options, &temp, best_filter, filters, palette_filter);
   if (!error) {
+    std::vector<unsigned char> new_filters;
+    lodepng::getFilterTypes(new_filters, *resultpng);
+    if (filter_bank.size() < (filter_index + 1) * h) filter_bank.resize((filter_index + 1) * h);
+    std::copy(new_filters.begin(), new_filters.end(), filter_bank.begin() + filter_index * h);
     (*resultpng).swap(temp);  // Store best result so far in the output.
   }
   if (!png_options.strip) {
@@ -535,7 +543,7 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   return error;
 }
 
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations) {
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index) {
   ZopfliPNGOptions png_options;
   png_options.Mode = Mode;
   png_options.multithreading = multithreading;
@@ -549,15 +557,22 @@ int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int f
 
   std::vector<unsigned char> filters;
   lodepng::load_file(origpng, Infile);
-  if (filter == 6){
+  if (filter == 6 || filter == 14) {
     lodepng::getFilterTypes(filters, origpng);
     if(!filters.size()){
       printf("Could not load PNG filters\n");
       return -1;
     }
   }
+  if (filter == 14) {
+    unsigned h = filters.size();
+    lodepng::State state;
+    filters.resize(h * state.encoder.ga.population_size);
+    std::copy(filter_bank.begin(), filter_bank.end(), filters.begin() + h);
+    lodepng::randomFilter(&filters[filter_bank.size() + h], filters.size() - filter_bank.size() - h);
+  }
   std::vector<unsigned char> resultpng;
-  if (ZopfliPNGOptimize(origpng, png_options, &resultpng, filter, filters, palette_filter)) {return -1;}
+  if (ZopfliPNGOptimize(origpng, png_options, &resultpng, filter, filters, palette_filter, filter_bank, filter_index)) {return -1;}
   if (resultpng.size() >= origpng.size()) {return 1;}
   lodepng::save_file(resultpng, Infile);
   return 0;

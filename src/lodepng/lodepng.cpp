@@ -3610,6 +3610,15 @@ static void filterScanline2(unsigned char* scanline, const unsigned char* prevli
 extern "C" size_t ZopfliLZ77LazyLauncher(const unsigned char* in,
                               size_t instart, size_t inend, unsigned fs);
 
+/* log2 approximation. A slight bit faster than std::log. */
+static float flog2(float f)
+{
+  float result = 0;
+  while(f > 32) { result += 4; f /= 16; }
+  while(f > 2) { ++result; f /= 2; }
+  return result + 1.442695f * (f * f * f / 3 - 3 * f * f / 2 + 3 * f - 1.83333f);
+}
+
 static void initRandomUInt64(uint64_t* s) {
   /* xorshift+ requires 128 bits of state */
   s[0] = 1;
@@ -4170,7 +4179,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
       printf("warning: You have decided to enable genetic filtering, which may take a very long time.\n"
              "the current generation and number of bytes is displayed.\n"
              "you can stop the genetic filtering anytime by pressing ctrl-c\n"
-             "it will automatically stop after 500 generations without progress\n");
+             "it will automatically stop after %i generations without progress\n", settings->ga.number_of_stagnations);
       signaled = 0;
     }
 
@@ -4186,7 +4195,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
 
     const int Strategies = strategy == LFS_ALL_CHEAP ? 3 : 0;
     /*Genetic algorithm filter finder. Attempts to find better filters through mutation and recombination.*/
-    const size_t population_size = strategy == LFS_ALL_CHEAP ? Strategies : 19;
+    const size_t population_size = strategy == LFS_ALL_CHEAP ? Strategies : std::max(int(settings->ga.population_size), 2);
     const size_t last = population_size - 1;
     unsigned char* population = (unsigned char*)lodepng_malloc(h * population_size);
     size_t* size = (size_t*)lodepng_malloc(population_size * sizeof(size_t));
@@ -4204,13 +4213,56 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
     int err = deflateInit2(&stream, 3, Z_DEFLATED, windowbits(h * (linebytes + 1)), 8, Z_FILTERED);
     if (err != Z_OK) exit(1);
     unsigned char* dummy = (unsigned char *)1;
-    size_t popcnt;
-    uint64_t r2[2];
-    initRandomUInt64(r2);
+    size_t popcnt = 0;
     signal(SIGINT, sig_handler);
-    for(popcnt = 0; popcnt < h * (population_size - Strategies); ++popcnt) population[popcnt] = randomUInt64(r2) % 5;
+    /*evaluate initial population*/
+    memcpy(population, settings->predefined_filters, h * population_size);
+    /* for very small images, try every combination instead of genetic algorithm */
+    if(strategy == LFS_GENETIC && h * flog2(5) < flog2(population_size * settings->ga.number_of_stagnations))
+    {
+      i = h;
+      for(i = 0; i < h; ++i) population[h + i] = 0;
+      while(i + 1 > 0 && !signaled)
+      {
+        prevline = 0;
+        if(clean){
+          memcpy(linebuf, &in[y * linebytes], linebytes);
+          filterScanline2(linebuf, prevline, linebytes, type, 0);
+          filterScanline(&out[y * (linebytes + 1) + 1], linebuf, prevline, linebytes, bytewidth, type);
+          memcpy(prevlinebuf, linebuf, linebytes);
+          prevline = prevlinebuf;
+        }
+        else{
+          filterScanline(&out[y * (linebytes + 1) + 1], &in[y * linebytes], prevline, linebytes, bytewidth, type);
+          prevline = &in[y * linebytes];
+        }
+        size[0] = 0;
+        TUNE
+        stream.next_in = (z_const unsigned char *)out;
+        stream.avail_in = h * (linebytes + 1);
+        stream.avail_out = UINT_MAX;
+        stream.next_out = dummy;
 
-    for(g = 0; g <= last; ++g)
+        deflate_nooutput(&stream, Z_FINISH);
+
+        size[0] = stream.total_out;
+        deflateReset(&stream);
+        if(size[0] < best_size)
+        {
+          memcpy(&population[h], population, h);
+          best_size = size[0];
+        }
+        for(i = h - 1 ; i + 1 > 0 ; --i)
+        {
+          if(++population[h + i] < 5) break;
+          else population[h + i] = 0;
+        }
+      }
+      ranking[0] = 0;
+      signaled = 1;
+    }
+
+    for(g = 0; g <= last && !signaled; ++g)
     {
       if (strategy == LFS_ALL_CHEAP){
         settings->filter_strategy = (LodePNGFilterStrategy)(g + 11);
@@ -4259,7 +4311,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
       }
     }
     //ctrl-c signals last iteration
-    for(e = 0; strategy == LFS_GENETIC && e_since_best < 500 && !signaled; ++e)
+    for(e = 0; strategy == LFS_GENETIC && e < settings->ga.number_of_generations && e_since_best < settings->ga.number_of_stagnations && !signaled; ++e)
     {
       /*resort rankings*/
       for(i = 1; i < population_size; ++i)
@@ -4276,24 +4328,24 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
       }
       else ++e_since_best;
       /*generate offspring*/
-      for(c = 0; c < 3; ++c)
+      for(c = 0; c < settings->ga.number_of_offspring; ++c)
       {
         /*tournament selection*/
         /*parent 1*/
         selection_size = UINT_MAX;
-        for(t = 0; t < 2; ++t) selection_size = std::min(unsigned(randomDecimal(r) * total_size), selection_size);
+        for(t = 0; t < settings->ga.tournament_size; ++t) selection_size = std::min(unsigned(randomDecimal(r) * total_size), selection_size);
         size_sum = 0;
         for(j = 0; size_sum <= selection_size; ++j) size_sum += size[ranking[j]];
         unsigned char* parent1 = &population[ranking[j - 1] * h];
         /*parent 2*/
         selection_size = UINT_MAX;
-        for(t = 0; t < 2; ++t) selection_size = std::min(unsigned(randomDecimal(r) * total_size), selection_size);
+        for(t = 0; t < settings->ga.tournament_size; ++t) selection_size = std::min(unsigned(randomDecimal(r) * total_size), selection_size);
         size_sum = 0;
         for(j = 0; size_sum <= selection_size; ++j) size_sum += size[ranking[j]];
         unsigned char* parent2 = &population[ranking[j - 1] * h];
         /*two-point crossover*/
         unsigned char* child = &population[(ranking[last - c]) * h];
-        if(randomDecimal(r) < 0.9)
+        if(randomDecimal(r) < settings->ga.crossover_probability)
         {
           crossover1 = randomUInt64(r) % h;
           crossover2 = randomUInt64(r) % h;
@@ -4315,7 +4367,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
         /*mutation*/
         for(y = 0; y < h; ++y)
         {
-          if(randomDecimal(r) < 0.01) child[y] = randomUInt64(r) % 5;
+          if(randomDecimal(r) < settings->ga.mutation_probability) child[y] = randomUInt64(r) % 5;
         }
         /*evaluate new genome*/
         total_size -= size[ranking[last - c]];
@@ -4807,6 +4859,13 @@ void lodepng_encoder_settings_init(LodePNGEncoderSettings* settings)
 #ifdef LODEPNG_COMPILE_ANCILLARY_CHUNKS
   settings->text_compression = 1;
 #endif /*LODEPNG_COMPILE_ANCILLARY_CHUNKS*/
+  settings->ga.crossover_probability = 0.9;
+  settings->ga.mutation_probability = 0.01;
+  settings->ga.number_of_generations = UINT_MAX;
+  settings->ga.number_of_offspring = 5;
+  settings->ga.number_of_stagnations = 500;
+  settings->ga.population_size = 19;
+  settings->ga.tournament_size = 2;
 }
 
 #endif /*LODEPNG_COMPILE_ENCODER*/
@@ -5036,5 +5095,11 @@ unsigned encode(std::vector<unsigned char>& out,
 }
 #endif //LODEPNG_COMPILE_ENCODER
 #endif //LODEPNG_COMPILE_PNG
+
+void randomFilter(unsigned char* filter, unsigned n) {
+  uint64_t r[2];
+  initRandomUInt64(r);
+  for(unsigned i = 0; i < n; ++i) filter[i] = randomUInt64(r) % 5;
+}
 } //namespace lodepng
 #endif /*LODEPNG_COMPILE_CPP*/
