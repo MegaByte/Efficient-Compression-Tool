@@ -1,7 +1,7 @@
 //  main.cpp
 //  Efficient Compression Tool
-//  Created by Felix Hanau on 19.12.14.
-//  Copyright (c) 2014-2016 Felix Hanau.
+//  Created by Felix Hanau on 12/19/14.
+//  Copyright (c) 2014-2018 Felix Hanau.
 
 #include "main.h"
 #include "support.h"
@@ -17,6 +17,10 @@
 #include <id3/tag.h>
 #endif
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 static size_t processedfiles;
 static size_t bytes;
 static long long savings;
@@ -24,7 +28,7 @@ static long long savings;
 static void Usage() {
     printf (
             "Efficient Compression Tool\n"
-            "(c) 2014-2017 Felix Hanau.\n"
+            "(c) 2014-2018 Felix Hanau.\n"
             "Version 0.8.2"
 #ifdef __DATE__
             " compiled on %s\n"
@@ -74,6 +78,14 @@ static void Usage() {
             ,__DATE__
 #endif
             );
+}
+
+static void RenameAndReplace(const char * Infile, const char * Outfile){
+#ifdef _WIN32
+    MoveFileExA(Infile, Outfile, MOVEFILE_REPLACE_EXISTING);
+#else
+    rename(Infile, Outfile);
+#endif
 }
 
 static void ECT_ReportSavings(){
@@ -142,8 +154,7 @@ static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multi
     }
     ZopfliGzip(((std::string)Infile).append(".ungz").c_str(), 0, Mode, multithreading, ZIP, iterations, stagnations);
     if (filesize(((std::string)Infile).append(".ungz.gz").c_str()) < filesize(Infile)){
-        unlink(Infile);
-        rename(((std::string)Infile).append(".ungz.gz").c_str(), Infile);
+        RenameAndReplace(((std::string)Infile).append(".ungz.gz").c_str(), Infile);
     }
     else {
         unlink(((std::string)Infile).append(".ungz.gz").c_str());
@@ -227,8 +238,7 @@ static unsigned char OptimizePNG(const char * Infile, const ECTOptions& Options)
             unlink(((std::string)Infile).append(".bak").c_str());
         }
         else {
-            unlink(Infile);
-            rename(((std::string)Infile).append(".bak").c_str(), Infile);
+            RenameAndReplace(((std::string)Infile).append(".bak").c_str(), Infile);
         }
     }
 
@@ -251,6 +261,7 @@ static unsigned char OptimizeJPEG(const char * Infile, const ECTOptions& Options
 }
 
 #ifdef MP3_SUPPORTED
+#error MP3 code may corrupt metadata.
 static void OptimizeMP3(const char * Infile, const ECTOptions& Options){
     ID3_Tag orig (Infile);
     size_t start = orig.Size();

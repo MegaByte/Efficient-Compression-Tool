@@ -1189,10 +1189,10 @@ static void DeflateSplittingFirst2(
   BlockData* blockend = data + numblocks;
   std::mutex mtx;
   for (i = 0; i < threads; i++) {
-    multi[i % threads] = std::thread(DeflateDynamicBlock2,options, in, &data, blockend, std::ref(mtx));
+    multi[i] = std::thread(DeflateDynamicBlock2,options, in, &data, blockend, std::ref(mtx));
   }
-  for (size_t j = 0; j < threads; j++){
-    multi[j].join();
+  for(std::thread& t : multi) {
+    t.join();
   }
 
   if (twiceMode & 1){
@@ -1304,7 +1304,7 @@ static void DeflateSplittingFirst(const ZopfliOptions* options,
   SymbolStats* statsp = 0;
   ZopfliBlockSplit(options, in, instart, inend, &splitpoints, &npoints, &statsp, twiceMode, *twiceStore);
 
-  ZopfliLZ77Store* stores = 0;
+  ZopfliLZ77Store* stores;
   if (twiceMode & 1){
     stores = (ZopfliLZ77Store*)malloc((npoints + 1) * sizeof(ZopfliLZ77Store));
     if(!stores){
@@ -1316,7 +1316,7 @@ static void DeflateSplittingFirst(const ZopfliOptions* options,
     size_t end = i == npoints ? inend : splitpoints[i];
     unsigned x = npoints == 0 ? 0 : i == 0 ? 2 : i == npoints ? 1 : 3;
     DeflateDynamicBlock(options, i == npoints && final, in, start, end,
-                        bp, out, outsize, costmodelnotinited, &(statsp[i]), twiceMode, stores ? stores + i : 0, x);
+                        bp, out, outsize, costmodelnotinited, &(statsp[i]), twiceMode, stores + i, x);
   }
   if (twiceMode & 1){
     ZopfliInitLZ77Store(twiceStore);
@@ -1365,7 +1365,7 @@ void ZopfliDeflate(const ZopfliOptions* options, int final,
     return;
   }
 #ifndef NOMULTI
-  if(options->multithreading > 1){
+  if(options->multithreading > 1 && insize >= options->noblocksplit){
     ZopfliDeflateMulti(options, final, in, insize, bp, out, outsize);
     return;
   }
@@ -1373,6 +1373,7 @@ void ZopfliDeflate(const ZopfliOptions* options, int final,
 #if ZOPFLI_MASTER_BLOCK_SIZE == 0
   ZopfliDeflatePart(options, final, in, 0, insize, bp, out, outsize, &costmodelnotinited);
 #else
+
   size_t i = 0;
   size_t msize = ZOPFLI_MASTER_BLOCK_SIZE;
   unsigned char costmodelnotinited = 1;
