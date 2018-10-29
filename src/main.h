@@ -47,7 +47,7 @@ struct ECTOptions{
 };
 
 int Optipng(unsigned level, const char * Infile, bool force_no_palette, unsigned clean_alpha);
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index);
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned quiet, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index);
 int mozjpegtran (bool arithmetic, bool progressive, bool strip, const char * Infile, const char * Outfile, size_t* stripped_outsize);
 int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP, unsigned iterations, unsigned stagnations);
 void ZopfliBuffer(unsigned mode, unsigned multithreading, const unsigned char* in, size_t insize, unsigned char** out, size_t* outsize, unsigned iterations, unsigned stagnations);

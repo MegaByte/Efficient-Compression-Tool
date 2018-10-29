@@ -47,6 +47,8 @@ struct ZopfliPNGOptions {
   //Use per block multithreading
   unsigned multithreading;
 
+  unsigned quiet;
+
   // Absolute maximum number of iterations
   unsigned iterations;
 
@@ -387,6 +389,7 @@ static unsigned TryOptimize(std::vector<unsigned char>& image, unsigned w, unsig
   state.encoder.zlibsettings.custom_deflate = CustomPNGDeflate;
   state.encoder.zlibsettings.custom_context = png_options;
   state.encoder.clean_alpha = png_options->lossy_transparent;
+  state.encoder.quiet = png_options->quiet;
   state.encoder.ga.number_of_generations = png_options->iterations;
   if (png_options->stagnations > 0) state.encoder.ga.number_of_stagnations = png_options->stagnations;
 
@@ -543,10 +546,11 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   return error;
 }
 
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index) {
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned quiet, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index) {
   ZopfliPNGOptions png_options;
   png_options.Mode = Mode;
   png_options.multithreading = multithreading;
+  png_options.quiet = quiet;
   unsigned palette_filter = (filter & 0xFF00) >> 8;
   filter &= 0xFF;
   png_options.lossy_transparent = !strict && filter != 6;
