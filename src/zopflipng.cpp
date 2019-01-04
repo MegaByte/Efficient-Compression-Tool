@@ -535,6 +535,8 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   }
   std::vector<unsigned char> temp;
   error = TryOptimize(image, imagesize, w, h, bit16, inputstate, &png_options, &temp, best_filter, filters, palette_filter);
+  free(image);
+  image = 0;
   if (!error) {
     std::vector<unsigned char> new_filters;
     lodepng::getFilterTypes(new_filters, *resultpng);
