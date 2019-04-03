@@ -253,22 +253,22 @@ static void CompressFile(const ZopfliOptions* options,
   free(out);
 }
 
-int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP, unsigned iterations, unsigned stagnations) {
+int ZopfliGzip(const char* filename, const char* outname, unsigned mode, unsigned multithreading, unsigned ZIP, unsigned iterations, unsigned stagnations, unsigned ultra) {
   ZopfliOptions options;
   //ZopfliFormat output_type = ZOPFLI_FORMAT_GZIP;
   //output_type = ZOPFLI_FORMAT_ZLIB;
   //output_type = ZOPFLI_FORMAT_DEFLATE;
 
-  ZopfliInitOptions(&options, mode, multithreading, 0, iterations, stagnations);
+  ZopfliInitOptions(&options, mode, multithreading, 0, iterations, stagnations, ultra);
   //Append ".gz" ".zlib" ".deflate"
 
   CompressFile(&options, ZIP ? ZOPFLI_FORMAT_ZIP : ZOPFLI_FORMAT_GZIP, filename, outname ? outname : ((std::string)filename).append(ZIP ? ".zip" : ".gz").c_str());
   return 0;
 }
 
-void ZopfliBuffer(unsigned mode, unsigned multithreading, const unsigned char* in, size_t insize, unsigned char** out, size_t* outsize, unsigned iterations, unsigned stagnations) {
+void ZopfliBuffer(unsigned mode, unsigned multithreading, const unsigned char* in, size_t insize, unsigned char** out, size_t* outsize, unsigned iterations, unsigned stagnations, unsigned ultra) {
   ZopfliOptions options;
-  ZopfliInitOptions(&options, mode, multithreading, 0, iterations, stagnations);
+  ZopfliInitOptions(&options, mode, multithreading, 0, iterations, stagnations, ultra);
   unsigned char bp = 0;
   ZopfliDeflate(&options, 1, in, insize, &bp, out, outsize);
 }

@@ -68,6 +68,7 @@ static void Usage() {
             " --allfilters-b Try all PNG filter modes, including brute force strategies\n"
             " --genetic      Try genetic algorithm filter finder\n"
             " --pal_sort=i   Try i different PNG palette filtering strategies (up to 120)\n"
+            " --ultra=i      Ultra level (0-3)\n"
 #ifndef NOMULTI
             " --mt-deflate   Use per block multithreading in Deflate\n"
             " --mt-deflate=i Use per block multithreading in Deflate with i threads\n"
@@ -128,7 +129,7 @@ static void ECT_ReportSavings(){
     else {printf("No compatible files found\n");}
 }
 
-static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multithreading, long long fs, unsigned ZIP, int strict, unsigned iterations, unsigned stagnations){
+static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multithreading, long long fs, unsigned ZIP, int strict, unsigned iterations, unsigned stagnations, unsigned ultra){
     if (!fs){
         printf("%s: Compression of empty files is currently not supported\n", Infile);
         return 2;
@@ -146,7 +147,7 @@ static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multi
             printf("%s: Compressed file already exists\n", Infile);
             return 2;
         }
-        ZopfliGzip(Infile, 0, Mode, multithreading, ZIP, iterations, stagnations);
+        ZopfliGzip(Infile, 0, Mode, multithreading, ZIP, iterations, stagnations, ultra);
         return 1;
     }
     if (exists(((std::string)Infile).append(".ungz").c_str())){
@@ -158,7 +159,7 @@ static int ECTGzip(const char * Infile, const unsigned Mode, unsigned char multi
     if(ungz(Infile, ((std::string)Infile).append(".ungz").c_str())){
         return 2;
     }
-    ZopfliGzip(((std::string)Infile).append(".ungz").c_str(), 0, Mode, multithreading, ZIP, iterations, stagnations);
+    ZopfliGzip(((std::string)Infile).append(".ungz").c_str(), 0, Mode, multithreading, ZIP, iterations, stagnations, ultra);
     if (filesize(((std::string)Infile).append(".ungz.gz").c_str()) < filesize(Infile)){
         RenameAndReplace(((std::string)Infile).append(".ungz.gz").c_str(), Infile);
     }
@@ -186,7 +187,7 @@ static unsigned char OptimizePNG(const char * Infile, const ECTOptions& Options)
         return 1;
     }
     if(mode == 9 && !Options.Reuse && !Options.Allfilters){
-        x = Zopflipng(Options.strip, Infile, Options.Strict, 3, 0, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+        x = Zopflipng(Options.strip, Infile, Options.Strict, 3, 0, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
         if(x < 0){
             return 1;
         }
@@ -206,34 +207,34 @@ static unsigned char OptimizePNG(const char * Infile, const ECTOptions& Options)
     }
     if (mode != 1){
         if (Options.Allfilters){
-            x = Zopflipng(Options.strip, Infile, Options.Strict, _mode, 6 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+            x = Zopflipng(Options.strip, Infile, Options.Strict, _mode, 6 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
             if(x < 0){
                 return 1;
             }
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 5 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 1 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 2 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 3 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 4 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 7 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 8 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 11 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 12 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 13 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 5 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 1 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 2 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 3 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 4 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 7 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 8 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 11 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 12 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, 13 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
             if (Options.Allfiltersbrute){
-                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 9 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 10 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
-                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 14 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 9 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 10 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
+                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 14 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
             } else if (Options.Genetic) {
-                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 14 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+                Zopflipng(Options.strip, Infile, Options.Strict, _mode, 14 + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
             }
         }
         else if (mode == 9){
-            Zopflipng(Options.strip, Infile, Options.Strict, _mode, filter + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+            Zopflipng(Options.strip, Infile, Options.Strict, _mode, filter + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
         }
         else {
-            x = Zopflipng(Options.strip, Infile, Options.Strict, _mode, filter + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, filter_bank, ++attempt);
+            x = Zopflipng(Options.strip, Infile, Options.Strict, _mode, filter + Options.palette_sort, Options.DeflateMultithreading, quiet, Options.Iterations, Options.Stagnations, Options.Ultra, filter_bank, ++attempt);
             if(x < 0){
                 return 1;
             }
@@ -325,7 +326,7 @@ unsigned fileHandler(const char * Infile, const ECTOptions& Options, int interna
                 error = OptimizeJPEG(Infile, Options);
             }
             else if (Options.Gzip && !internal){
-                statcompressedfile = ECTGzip(Infile, Options.Mode, Options.DeflateMultithreading, size, Options.Zip, Options.Strict, Options.Iterations, Options.Stagnations);
+                statcompressedfile = ECTGzip(Infile, Options.Mode, Options.DeflateMultithreading, size, Options.Zip, Options.Strict, Options.Iterations, Options.Stagnations, Options.Ultra);
                 if (statcompressedfile == 2){
                     return 1;
                 }
@@ -610,6 +611,10 @@ int main(int argc, const char * argv[]) {
             else if (strncmp(argv[i], "--stagnations=", 14) == 0){
                 Options.Stagnations = atoi(argv[i] + 14);
                 if (Options.Stagnations < 1) Options.Stagnations = 1;
+            }
+            else if (strncmp(argv[i], "--ultra=", 8) == 0){
+                Options.Ultra = atoi(argv[i] + 8);
+                if (Options.Ultra > 3) Options.Ultra = 3;
             }
             else {printf("Unknown flag: %s\n", argv[i]); return 0;}
         }

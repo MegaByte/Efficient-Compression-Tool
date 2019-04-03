@@ -210,7 +210,7 @@ static const ZopfliOptionsMin opt[8] =
   {60, 2, 3,  800, 3000,  80,  100}  /* 9 */
 };
 
-void ZopfliInitOptions(ZopfliOptions* options, unsigned _mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations) {
+void ZopfliInitOptions(ZopfliOptions* options, unsigned _mode, unsigned multithreading, unsigned isPNG, unsigned iterations, unsigned stagnations, unsigned ultra) {
   options->twice = (_mode - (_mode % 10000)) / 10000;
   unsigned mode = _mode % 10000 > 9 ? 9 : _mode % 10000;
   if (mode < 2){
@@ -234,7 +234,7 @@ void ZopfliInitOptions(ZopfliOptions* options, unsigned _mode, unsigned multithr
   options->isPNG = isPNG;
   options->reuse_costmodel = (!isPNG || mode > 6) && multithreading < 2;
   options->useCache = 1;
-  options->ultra = (mode >= 5) + (options->numiterations > 60) + (options->numiterations > 90);
+  options->ultra = ultra != UINT_MAX ? ultra : (mode >= 5) + (options->numiterations > 60) + (options->numiterations > 90);
   options->entropysplit = mode < 3;
   options->greed = isPNG ? mode > 3 ? 258 : 50 : 258;
   options->advanced = mode >= 5;

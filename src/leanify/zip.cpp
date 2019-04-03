@@ -371,7 +371,7 @@ size_t Zip::Leanify(const ECTOptions& Options, size_t* files) {
     // recompress
     uint8_t* compress_buf = nullptr;
     size_t new_comp_size = 0;
-    ZopfliBuffer(Options.Mode, Options.DeflateMultithreading, decompress_buf, new_uncomp_size, &compress_buf, &new_comp_size, Options.Iterations, Options.Stagnations);
+    ZopfliBuffer(Options.Mode, Options.DeflateMultithreading, decompress_buf, new_uncomp_size, &compress_buf, &new_comp_size, Options.Iterations, Options.Stagnations, Options.Ultra);
 
     // switch to store if deflate makes file larger
     if (new_uncomp_size <= new_comp_size && new_uncomp_size <= local_header->compressed_size) {

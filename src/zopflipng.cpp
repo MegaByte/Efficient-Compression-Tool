@@ -54,6 +54,9 @@ struct ZopfliPNGOptions {
 
   // Number of iterations without improvement
   unsigned stagnations;
+
+  // Ultra level
+  unsigned ultra;
 };
 
 ZopfliPNGOptions::ZopfliPNGOptions()
@@ -69,7 +72,7 @@ static unsigned CustomPNGDeflate(unsigned char** out, size_t* outsize, const uns
   const ZopfliPNGOptions* png_options = static_cast<const ZopfliPNGOptions*>(settings->custom_context);
   unsigned char bp = 0;
   ZopfliOptions options;
-  ZopfliInitOptions(&options, png_options->Mode, png_options->multithreading, 1, png_options->iterations, png_options->stagnations);
+  ZopfliInitOptions(&options, png_options->Mode, png_options->multithreading, 1, png_options->iterations, png_options->stagnations, png_options->ultra);
   ZopfliDeflate(&options, 1, in, insize, &bp, out, outsize);
   return 0;
 }
@@ -394,7 +397,7 @@ static unsigned TryOptimize(unsigned char* image, size_t imagesize, unsigned w, 
   if (png_options->stagnations > 0) state.encoder.ga.number_of_stagnations = png_options->stagnations;
 
   ZopfliOptions dummyoptions;
-  ZopfliInitOptions(&dummyoptions, png_options->Mode, 0, 0, png_options->iterations, png_options->stagnations);
+  ZopfliInitOptions(&dummyoptions, png_options->Mode, 0, 0, png_options->iterations, png_options->stagnations, png_options->ultra);
   state.encoder.filter_style = dummyoptions.filter_style;
   state.encoder.text_compression = 0;
   if (bit16) {
@@ -553,7 +556,7 @@ static unsigned ZopfliPNGOptimize(const std::vector<unsigned char>& origpng, con
   return error;
 }
 
-int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned quiet, unsigned iterations, unsigned stagnations, std::vector<unsigned char>& filter_bank, int filter_index) {
+int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int filter, unsigned multithreading, unsigned quiet, unsigned iterations, unsigned stagnations, unsigned ultra, std::vector<unsigned char>& filter_bank, int filter_index) {
   ZopfliPNGOptions png_options;
   png_options.Mode = Mode;
   png_options.multithreading = multithreading;
@@ -564,6 +567,7 @@ int Zopflipng(bool strip, const char * Infile, bool strict, unsigned Mode, int f
   png_options.strip = strip;
   png_options.iterations = iterations;
   png_options.stagnations = stagnations;
+  png_options.ultra = ultra;
   std::vector<unsigned char> origpng;
 
   std::vector<unsigned char> filters;
