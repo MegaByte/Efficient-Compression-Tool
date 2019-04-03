@@ -3641,14 +3641,15 @@ static double randomDecimal(uint64_t* s) {
 }
 
 #include <signal.h>
-static int signaled = 0;
+#include <atomic>
+static std::atomic<int> signaled(0);
 static void sig_handler(int signo)
 {
   if (signo == SIGINT){
-    if(signaled == 0) {
+    if(signaled.load() == 0) {
       printf("received SIGINT, will stop after this iteration\n");
     }
-    signaled = 1;
+    signaled.store(1);
   }
 }
 
@@ -4184,7 +4185,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
                "you can stop the genetic filtering anytime by pressing ctrl-c\n"
                "it will automatically stop after %i generations without progress\n", settings->ga.number_of_stagnations);
       }
-      signaled = -settings->quiet;
+      signaled.store(-settings->quiet);
     }
 
     unsigned char* prevlinebuf = 0;
@@ -4315,7 +4316,7 @@ static unsigned filter(unsigned char* out, unsigned char* in, unsigned w, unsign
       }
     }
     //ctrl-c signals last iteration
-    for(e = 0; strategy == LFS_GENETIC && e < settings->ga.number_of_generations && e_since_best < settings->ga.number_of_stagnations && signaled <= 0; ++e)
+    for(e = 0; strategy == LFS_GENETIC && e < settings->ga.number_of_generations && e_since_best < settings->ga.number_of_stagnations && signaled.load() <= 0; ++e)
     {
       /*resort rankings*/
       for(i = 1; i < population_size; ++i)

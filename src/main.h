@@ -3,7 +3,6 @@
 //  Efficient Compression Tool
 //
 //  Created by Felix Hanau on 02.01.15.
-//  Copyright (c) 2015 Felix Hanau.
 //
 
 #include <cstdio>
@@ -48,6 +47,7 @@ struct ECTOptions{
   bool Recurse;
 #endif
   unsigned DeflateMultithreading;
+  unsigned FileMultithreading;
   bool keep;
   unsigned Iterations;
   unsigned Stagnations;
