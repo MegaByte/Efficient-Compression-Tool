@@ -187,11 +187,17 @@ static void LZ4HC_Insert3 (LZ3HC_Data_Structure* hc4, const BYTE* ip)
 
   hc4->nextToUpdate = target;
 }
-
+static size_t fu;
 static int LZ4HC_InsertAndFindBestMatch3 (LZ3HC_Data_Structure* hc4,   /* Index table will be updated */
                                           const BYTE* ip, const BYTE* const iLimit,
-                                          unsigned matches[])
+                                          unsigned* matches)
+//Use dists for each length again
+//Or hmm trimmed matches
 {
+  //we can guarantee this to be <= 256 * 32. We can also guarantee the entire search to be <256 * 32 while currently it is up to 32 * 1024 * 256. This represents a massive bottleneck for mode 7+ image compression
+  //either dists
+  //or
+  //allow match if longest length or if it's cheaper than prev matches with array for each length
   if (iLimit - ip < 3){
     return 0;
   }
@@ -203,14 +209,27 @@ static int LZ4HC_InsertAndFindBestMatch3 (LZ3HC_Data_Structure* hc4,   /* Index 
 
   /* HC3 match finder */
   LZ4HC_Insert3(hc4, ip);
+  int lastdsym = 30;
   U32 matchIndex = HashTable[LZ4HC_hashPtr3(ip)];
 
   while ((matchIndex>=lowLimit))
   {
     const BYTE* match = base + matchIndex;
     size_t mlt = GetMatch(ip, match, iLimit, iLimit - 8) - ip;
-    if (likely(mlt >= 3)) {
-      matches[num++] = mlt; matches[num++] = ip - match;
+    //if (likely(mlt >= 3)) {
+    ptrdiff_t dist = ip - match;
+    //if (mlt > 3 && (ZopfliGetDistSymbol(dist) != lastdsym || mlt > matches[num - 2])) {
+    fu+= mlt == 258;
+    if (mlt >= 3) {//don't add if same/bigger length is already available at cheaper price
+      if(ZopfliGetDistSymbol(dist) != lastdsym) {
+        //fu++;
+        matches[num++] = mlt; matches[num++] = dist;
+        lastdsym = ZopfliGetDistSymbol(dist);
+      }
+      else if(mlt > matches[num - 2]) {
+        matches[num - 2] = mlt; matches[num - 1] = dist;
+        lastdsym = ZopfliGetDistSymbol(dist);
+      }
     }
     matchIndex -= chainTable[matchIndex & MAX_DISTANCE3];
   }
@@ -539,14 +558,14 @@ static void GetBestLengths(const ZopfliOptions* options, const unsigned char* in
 
           if (mfinexport & 2 && i + match > inend - ZOPFLI_MAX_MATCH - 1 && i <= inend - ZOPFLI_MAX_MATCH - 1) {
             unsigned now = inend - ZOPFLI_MAX_MATCH - i;
-            Bt3Zip_MatchFinder_Skip(&p, now);
             CopyMF(&p, &mf);
             right = 1;
-            Bt3Zip_MatchFinder_Skip(&p, match - now);
+            Bt3Zip_MatchFinder_Skip2(&p, now);
+            Bt3Zip_MatchFinder_Skip2(&p, match - now);
 
           }
           else{
-            Bt3Zip_MatchFinder_Skip(&p, match);
+            Bt3Zip_MatchFinder_Skip2(&p, match);
           }
         notenoughsame = i + same + ZOPFLI_MAX_MATCH - 1;
 
@@ -664,8 +683,11 @@ static void GetBestLengthsultra2(const unsigned char* in, size_t instart, size_t
   LZ3HC_Data_Structure h3;
   LZ4HC_init3(&h3, &in[windowstart]);
 
-  unsigned matchesarr[32768 * 2 + 1];
-    unsigned* matches = matchesarr;
+  unsigned matchesarr[62];
+  matchesarr[0] = 2;
+  matchesarr[1] = 0;
+
+    unsigned* matches = matchesarr + 2;
   for (i = instart; i < inend; i++) {
     size_t j = i - instart;  /* Index in the costs array and length_array. */
 
@@ -676,13 +698,12 @@ static void GetBestLengthsultra2(const unsigned char* in, size_t instart, size_t
       unsigned price = costs[j];
       unsigned* mp = matches;
 
-      unsigned curr = ZOPFLI_MIN_MATCH;
       while (mp < mend){
-        curr = ZOPFLI_MIN_MATCH;
         unsigned len = *mp++;
+        assert(len < 259);
         unsigned dist = *mp++;
         unsigned price2 = price + disttable[dist];
-        for (; curr <= len; curr++) {
+        for (unsigned curr = ZOPFLI_MIN_MATCH; curr <= len; curr++) {
           unsigned x = price2 + litlentable[curr];
           if (x < costs[j + curr]){
             costs[j + curr] = x;
@@ -702,6 +723,8 @@ static void GetBestLengthsultra2(const unsigned char* in, size_t instart, size_t
 
   free(disttable);
   free(costs);
+  printf("%zu %zu\n", fu, inend);
+
 }
 
 /*
