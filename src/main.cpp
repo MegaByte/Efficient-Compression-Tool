@@ -48,36 +48,38 @@ static void Usage() {
 #endif
             "...\n"
             "Options:\n"
-            " -1 to -9       Set compression level (Default: 3)\n"
-            " -strip         Strip metadata\n"
-            " -progressive   Use progressive encoding for JPEGs\n"
+            " -1 to -9          Set compression level (Default: 3)\n"
+            " -strip            Strip metadata\n"
+            " -progressive      Use progressive encoding for JPEGs\n"
+            " -autorotate       Automatically rotate JPEGs, when perfectly transformable\n"
+            " -autorotate=force Automatically rotate JPEGs, dropping non-transformable edge blocks\n"
 #ifdef BOOST_SUPPORTED
-            " -recurse       Recursively search directories\n"
+            " -recurse          Recursively search directories\n"
 #endif
-            " -zip           Compress file(s) with  ZIP algorithm\n"
-            " -gzip          Compress file with GZIP algorithm\n"
-            " -quiet         Print only error messages\n"
-            " -help          Print this help\n"
-            " -keep          Keep modification time\n"
+            " -zip              Compress file(s) with  ZIP algorithm\n"
+            " -gzip             Compress file with GZIP algorithm\n"
+            " -quiet            Print only error messages\n"
+            " -help             Print this help\n"
+            " -keep             Keep modification time\n"
             "Advanced Options:\n"
-            " --disable-png  Disable PNG optimization\n"
-            " --disable-jpg  Disable JPEG optimization\n"
-            " --strict       Enable strict losslessness\n"
-            " --reuse        Keep PNG filter and colortype\n"
-            " --allfilters   Try all PNG filter modes\n"
-            " --allfilters-b Try all PNG filter modes, including brute force strategies\n"
-            " --genetic      Try genetic algorithm filter finder\n"
-            " --pal_sort=i   Try i different PNG palette filtering strategies (up to 120)\n"
-            " --ultra=i      Ultra level (0-3)\n"
+            " --disable-png     Disable PNG optimization\n"
+            " --disable-jpg     Disable JPEG optimization\n"
+            " --strict          Enable strict losslessness\n"
+            " --reuse           Keep PNG filter and colortype\n"
+            " --allfilters      Try all PNG filter modes\n"
+            " --allfilters-b    Try all PNG filter modes, including brute force strategies\n"
+            " --genetic         Try genetic algorithm filter finder\n"
+            " --pal_sort=i      Try i different PNG palette filtering strategies (up to 120)\n"
+            " --ultra=i         Ultra level (0-3)\n"
 #ifndef NOMULTI
-            " --mt-deflate   Use per block multithreading in Deflate\n"
-            " --mt-deflate=i Use per block multithreading in Deflate with i threads\n"
-            " --mt-file      Use per file multithreading\n"
-            " --mt-file=i    Use per file multithreading with i threads\n"
+            " --mt-deflate      Use per block multithreading in Deflate\n"
+            " --mt-deflate=i    Use per block multithreading in Deflate with i threads\n"
+            " --mt-file         Use per file multithreading\n"
+            " --mt-file=i       Use per file multithreading with i threads\n"
 #endif
             //" --arithmetic   Use arithmetic encoding for JPEGs, incompatible with most software\n"
-            " --iterations=i  Absolute maximum number of iterations (overrides compression level)\n"
-            " --stagnations=i Number of iterations without improvement\n"
+            " --iterations=i    Absolute maximum number of iterations (overrides compression level)\n"
+            " --stagnations=i   Number of iterations without improvement\n"
 #ifdef __DATE__
             ,__DATE__
 #endif
@@ -258,10 +260,10 @@ static unsigned char OptimizePNG(const char * Infile, const ECTOptions& Options)
 static unsigned char OptimizeJPEG(const char * Infile, const ECTOptions& Options){
     size_t stsize = 0;
 
-    int res = mozjpegtran(Options.Arithmetic, Options.Progressive && (Options.Mode > 1 || filesize(Infile) > 5000), Options.strip, Infile, Infile, &stsize);
+    int res = mozjpegtran(Options.Arithmetic, Options.Progressive && (Options.Mode > 1 || filesize(Infile) > 5000), Options.strip, Options.Autorotate, Infile, Infile, &stsize);
     if (Options.Progressive && Options.Mode > 1 && res != 2){
         if(res == 1 || (Options.Mode == 2 && stsize < 6500) || (Options.Mode == 3 && stsize < 10000) || (Options.Mode == 4 && stsize < 15000) || (Options.Mode > 4 && stsize < 20000)){
-            res = mozjpegtran(Options.Arithmetic, false, Options.strip, Infile, Infile, &stsize);
+            res = mozjpegtran(Options.Arithmetic, false, Options.strip, Options.Autorotate, Infile, Infile, &stsize);
         }
     }
     return res == 2;
@@ -523,6 +525,7 @@ int main(int argc, const char * argv[]) {
     ECTOptions Options;
     Options.strip = false;
     Options.Progressive = false;
+    Options.Autorotate = 0;
     Options.Mode = 3;
 #ifdef BOOST_SUPPORTED
     Options.Recurse = false;
@@ -555,6 +558,8 @@ int main(int argc, const char * argv[]) {
             }
             else if (strncmp(argv[i], "-strip", strlen) == 0){Options.strip = true;}
             else if (strncmp(argv[i], "-progressive", strlen) == 0) {Options.Progressive = true;}
+            else if (strncmp(argv[i], "-autorotate", strlen) == 0) {Options.Autorotate = 2;} //Transform only if 'perfect'
+            else if (strncmp(argv[i], "-autorotate=force", strlen) == 0) {Options.Autorotate = 1;} //Always transform
             else if (argv[i][0] == '-' && isdigit(argv[i][1])) {
                 int l = atoi(argv[i] + 1);
                 if (!l) {
@@ -617,6 +622,9 @@ int main(int argc, const char * argv[]) {
                 if (Options.Ultra > 3) Options.Ultra = 3;
             }
             else {printf("Unknown flag: %s\n", argv[i]); return 0;}
+        }
+        if(Options.Autorotate > 0) {
+            if (!Options.strip) {printf("Flag -autorotate requires -strip\n"); return 0;}
         }
         if(Options.Reuse){
             Options.Allfilters = 0;
