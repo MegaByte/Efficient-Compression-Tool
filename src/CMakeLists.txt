@@ -1,11 +1,16 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
-project(ect VERSION 0.8.2 LANGUAGES CXX C)
+project(ect VERSION 0.8.3 LANGUAGES CXX C)
 
 include(GNUInstallDirs)
 set (CMAKE_CXX_STANDARD 11)
 
 if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Check that submodules are present only if source was downloaded with git
+if(EXISTS "${CMAKE_SOURCE_DIR}/../.git" AND NOT EXISTS "${CMAKE_SOURCE_DIR}/../src/libpng/README")
+    message (FATAL_ERROR "Submodules are not initialized. Run \n\tgit submodule update --init --recursive\n within the repository")
 endif()
 
 add_executable(ect
@@ -25,8 +30,11 @@ add_executable(ect
 add_executable(ect::ect ALIAS ect)
 
 if(MINGW)
-	add_compile_options(-mno-ms-bitfields)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mno-ms-bitfields>)
+	add_compile_options($<$<COMPILE_LANGUAGE:C>:-mno-ms-bitfields>)
 endif()
+
+
 
 # Use -Ofast in release builds
 foreach(var CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO)
@@ -47,6 +55,7 @@ add_subdirectory(lodepng EXCLUDE_FROM_ALL)
 add_subdirectory(miniz EXCLUDE_FROM_ALL)
 add_subdirectory(zlib EXCLUDE_FROM_ALL)
 add_subdirectory(zopfli EXCLUDE_FROM_ALL)
+file(COPY ${CMAKE_SOURCE_DIR}/pngusr.h DESTINATION ${CMAKE_SOURCE_DIR}/libpng/)
 add_subdirectory(optipng EXCLUDE_FROM_ALL)
 # Mozjpeg changes the install prefix if it thinks the current is defaulted
 set(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT FALSE)
